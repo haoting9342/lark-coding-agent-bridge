@@ -86,6 +86,8 @@ import { answerInMeeting, meetingScopeId } from '../meeting/orchestrator';
 import type { MeetingSession } from '../meeting/session';
 import { hasStructuredLarkCliUserAuth } from '../lark-cli/identity-policy';
 
+import { handleOpcDepartmentCommand } from '../opc/department-extension';
+
 export interface Controls {
   profile: string;
   profileConfig: ProfileConfig;
@@ -167,6 +169,7 @@ const AUDIT_SAFE_COMMAND_REPLY = '命令已处理。';
 const RESUME_APPLIED_REPLY = '已完成，请继续发送下一条消息。';
 
 const handlers: Record<string, Handler> = {
+  '/department': handleOpcDepartmentCommand,
   '/new': handleNew,
   '/reset': handleNew,
   '/cd': handleCd,
@@ -194,6 +197,7 @@ const handlers: Record<string, Handler> = {
  * owner is always allowed, while empty admin list means no listed admins.
  */
 const ADMIN_COMMANDS = new Set([
+  '/department',
   '/account',
   '/config',
   '/ps',

@@ -29,6 +29,7 @@ import {
 } from '../card/run-state';
 import { renderText } from '../card/text-renderer';
 import { tryHandleCommand, type Controls } from '../commands';
+import { tryHandleOpcDepartmentWizardReply } from '../opc/department-extension';
 import type { AppConfig } from '../config/schema';
 import {
   getAgentStopGraceMs,
@@ -717,6 +718,21 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
         log.warn('intake', 'non-allowed-hint-failed', { err: String(err) }),
       );
     }
+    return;
+  }
+
+  const opcDepartmentHandled = await tryHandleOpcDepartmentWizardReply({
+    channel,
+    msg: emsg,
+    scope,
+    chatMode,
+    workspaces,
+    activeRuns,
+    controls,
+  });
+  if (opcDepartmentHandled) {
+    const dropped = pending.cancel(scope);
+    log.info('intake', 'opc-department', { scope, droppedPending: dropped.length });
     return;
   }
 
