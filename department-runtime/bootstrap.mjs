@@ -1,6 +1,9 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { DepartmentCommandRuntime } from './department-command-runtime.mjs';
+import { DepartmentCapabilityMaterializer } from './department-capability-materializer.mjs';
 import { inventoryDepartmentContext } from './department-context-inventory.mjs';
 import { DepartmentDesignStore } from './department-design-store.mjs';
 import { DepartmentProvisioner } from './department-provisioner.mjs';
@@ -16,6 +19,18 @@ function requiredAbsolute(context, key) {
   return value;
 }
 
+function loadCapabilityCatalog(organizationRoot) {
+  const file = path.join(organizationRoot, 'company', 'capability-catalog.json');
+  if (!existsSync(file)) throw new Error(`capability catalog is missing: ${file}`);
+  const info = lstatSync(file);
+  if (!info.isFile() || info.isSymbolicLink()) throw new Error('capability catalog must be a regular file');
+  const document = JSON.parse(readFileSync(file, 'utf8'));
+  if (document.schemaVersion !== 1 || !Array.isArray(document.capabilities)) {
+    throw new Error('capability catalog schema is invalid');
+  }
+  return document.capabilities;
+}
+
 export async function getDepartmentRuntime(bridgeContext) {
   const organizationRoot = requiredAbsolute(bridgeContext, 'organizationRoot');
   const profileRoot = requiredAbsolute(bridgeContext, 'profileRoot');
@@ -25,6 +40,17 @@ export async function getDepartmentRuntime(bridgeContext) {
 
   const storeFile = path.join(profileRoot, 'departments', 'design-sessions.json');
   const designStore = new DepartmentDesignStore(storeFile);
+  const capabilityCatalog = loadCapabilityCatalog(organizationRoot);
+  const codexRoot = path.resolve(process.env.CODEX_HOME ?? path.join(homedir(), '.codex'));
+  const hostSkillsRoot = path.join(codexRoot, 'skills');
+  const capabilityMaterializer = new DepartmentCapabilityMaterializer({
+    hostSkillsRoot,
+    skillRoots: [hostSkillsRoot],
+    builtinCapabilities: capabilityCatalog
+      .filter((item) => item?.kind === 'builtin' && item?.source?.type === 'builtin')
+      .map((item) => item.source.name),
+    allowedLocalSkillRoots: [hostSkillsRoot, path.join(organizationRoot, 'capabilities')],
+  });
   const provisioner = new DepartmentProvisioner({
     organizationRoot,
     profileRoot,
@@ -33,6 +59,7 @@ export async function getDepartmentRuntime(bridgeContext) {
       apply: bridgeContext.applyWorkspaceRoute ?? (() => {}),
       restore: bridgeContext.restoreWorkspaceRoute ?? (() => {}),
     },
+    capabilityMaterializer,
   });
   const runtime = new DepartmentCommandRuntime({
     designStore,
@@ -40,7 +67,7 @@ export async function getDepartmentRuntime(bridgeContext) {
     provisioner,
     inventoryContext: (context) => inventoryDepartmentContext({
       workspace: context.currentWorkspace,
-      capabilityCatalog: [],
+      capabilityCatalog,
     }),
     draftCli: path.join(MODULE_ROOT, 'department-draft-cli.mjs'),
     storeFile,

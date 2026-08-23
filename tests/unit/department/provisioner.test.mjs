@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DepartmentProvisioner } from '../../../department-runtime/department-provisioner.mjs';
+import { DepartmentCapabilityMaterializer } from '../../../department-runtime/department-capability-materializer.mjs';
 
 function json(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
@@ -187,5 +188,38 @@ describe('node-native department provisioner', () => {
     expect(() => provisioner(environment).instance.provision(request(environment)))
       .toThrow(/chat.*already routed/i);
     expect(checksum(router)).toBe(before);
+  });
+
+  it('installs a confirmed local skill and records capability readiness in the receipt', () => {
+    const environment = fixture();
+    const trustedRoot = path.join(environment.root, 'trusted-skills');
+    const source = path.join(trustedRoot, 'outline-style');
+    const hostSkillsRoot = path.join(environment.root, 'host-skills');
+    mkdirSync(source, { recursive: true });
+    mkdirSync(hostSkillsRoot);
+    const manifest = '---\nname: outline-style\n---\n';
+    writeFileSync(path.join(source, 'SKILL.md'), manifest);
+    const input = request(environment);
+    input.draft.capabilityPlan = [{
+      id: 'outline-style', kind: 'skill', required: true, scope: 'workspace',
+      installPolicy: 'auto', nodeId: 'primary', bindingMode: 'install', identityBound: false,
+      source: {
+        type: 'local_skill', path: source,
+        sha256: createHash('sha256').update(manifest).digest('hex'),
+      },
+      verification: { type: 'skill_manifest' },
+    }];
+    input.draft.taskProtocols[0].skills = ['outline-style'];
+    const capabilityMaterializer = new DepartmentCapabilityMaterializer({
+      hostSkillsRoot,
+      allowedLocalSkillRoots: [trustedRoot],
+    });
+
+    const result = provisioner(environment, { capabilityMaterializer }).instance.provision(input);
+
+    expect(result.readiness).toBe('ready');
+    expect(result.capabilitySummary.installed).toBe(1);
+    expect(existsSync(path.join(environment.workspace, '.agents', 'skills', 'outline-style', 'SKILL.md'))).toBe(true);
+    expect(json(result.receiptPath).capabilityMaterialization.capabilities[0].status).toBe('installed');
   });
 });

@@ -1,4 +1,33 @@
 {
   "schemaVersion": 1,
-  "capabilities": []
+  "capabilities": [
+    {
+      "id": "department-design",
+      "kind": "builtin",
+      "required": false,
+      "scope": "host",
+      "installPolicy": "auto",
+      "source": {
+        "type": "builtin",
+        "name": "department-design"
+      },
+      "verification": {
+        "type": "builtin_registry"
+      }
+    },
+    {
+      "id": "managed-process-card",
+      "kind": "builtin",
+      "required": false,
+      "scope": "host",
+      "installPolicy": "auto",
+      "source": {
+        "type": "builtin",
+        "name": "managed-process-card"
+      },
+      "verification": {
+        "type": "builtin_registry"
+      }
+    }
+  ]
 }
