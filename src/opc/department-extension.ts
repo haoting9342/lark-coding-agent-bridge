@@ -2,6 +2,7 @@ import { canRunAdminCommand } from '../policy/access';
 import { log } from '../core/logger';
 import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { pathToFileURL } from 'node:url';
 
 let opcDepartmentBootstrapPromise: Promise<any> | undefined;
@@ -55,7 +56,7 @@ function bridgeContext(context: any): Record<string, unknown> {
   const knownChats = context.controls.knownChats ?? [];
   return {
     profile: context.controls.profile,
-    host: process.env.OPC_DEPARTMENT_HOST ?? '',
+    host: process.env.LARK_CHANNEL_DEPARTMENT_HOST ?? hostname(),
     botName: context.channel.botIdentity?.name ?? '',
     chatType: context.msg.chatType,
     chatId: context.msg.chatId,
@@ -82,8 +83,13 @@ function bridgeContext(context: any): Record<string, unknown> {
     ),
     profileRoot: join(dirname(context.controls.configPath), 'profiles', context.controls.profile),
     activeRunCount: () => context.activeRuns.scopes().length,
+    currentWorkspaceRoute: (chatId: string) => context.workspaces.cwdFor(chatId),
     applyWorkspaceRoute: (route: { chatId: string; cwd: string }) =>
       context.workspaces.setCwd(route.chatId, route.cwd),
+    restoreWorkspaceRoute: (chatId: string, cwd?: string) => {
+      if (cwd == null) context.workspaces.removeCwd(chatId);
+      else context.workspaces.setCwd(chatId, cwd);
+    },
     reply: (text: unknown) => reply(context, text),
     log: (payload: unknown) =>
       log.info('opc-department', 'runtime', runtimeLogFields(payload)),

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { DepartmentCommandRuntime } from './department-command-runtime.mjs';
 import { inventoryDepartmentContext } from './department-context-inventory.mjs';
 import { DepartmentDesignStore } from './department-design-store.mjs';
+import { DepartmentProvisioner } from './department-provisioner.mjs';
 
 const runtimes = new Map();
 const MODULE_ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -24,16 +25,19 @@ export async function getDepartmentRuntime(bridgeContext) {
 
   const storeFile = path.join(profileRoot, 'departments', 'design-sessions.json');
   const designStore = new DepartmentDesignStore(storeFile);
+  const provisioner = new DepartmentProvisioner({
+    organizationRoot,
+    profileRoot,
+    routeController: {
+      current: bridgeContext.currentWorkspaceRoute ?? (() => undefined),
+      apply: bridgeContext.applyWorkspaceRoute ?? (() => {}),
+      restore: bridgeContext.restoreWorkspaceRoute ?? (() => {}),
+    },
+  });
   const runtime = new DepartmentCommandRuntime({
     designStore,
     isDepartmentAdmin: (context) => context.isDepartmentAdmin === true,
-    provisioner: {
-      provision() {
-        const error = new Error('Node-native department provisioner is not ready');
-        error.stage = 'provisioner_unavailable';
-        throw error;
-      },
-    },
+    provisioner,
     inventoryContext: (context) => inventoryDepartmentContext({
       workspace: context.currentWorkspace,
       capabilityCatalog: [],

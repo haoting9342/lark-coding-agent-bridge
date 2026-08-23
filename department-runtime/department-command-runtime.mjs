@@ -70,13 +70,13 @@ function capabilityReply(result) {
       `部门已创建，但能力未完全就绪，事务 ${result.transactionId}。`,
       `能力结果：${summary}。`,
       ...(unresolved.length ? [`暂不可用的必需能力：${unresolved.join("、")}。`] : []),
-      "新路由已生效；能力问题可按事务回执继续处理，bridge 将在空闲后重启。",
+      "新路由已生效且无需重启 bridge；能力问题可按事务回执继续处理。",
     ].join("\n");
   }
   return [
     `部门已创建并完成能力对账，事务 ${result.transactionId}。`,
     `能力结果：${summary}。`,
-    "新路由已生效；若当前 bridge 有任务在运行，将在空闲后重启。",
+    "新路由已生效，无需重启 bridge。",
   ].join("\n");
 }
 
@@ -375,7 +375,7 @@ export class DepartmentCommandRuntime {
         draft,
         contextInventory: state.contextInventory,
       });
-      this.applyWorkspaceRoute(result.workspaceRoute);
+      if (result.workspaceRouteApplied !== true) this.applyWorkspaceRoute(result.workspaceRoute);
       this.designStore.completeProvisioning(state.key, {
         transactionId: result.transactionId,
         receiptPath: result.receiptPath,
