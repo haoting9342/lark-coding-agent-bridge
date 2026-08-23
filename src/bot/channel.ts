@@ -29,7 +29,7 @@ import {
 } from '../card/run-state';
 import { renderText } from '../card/text-renderer';
 import { tryHandleCommand, type Controls } from '../commands';
-import { tryHandleOpcDepartmentWizardReply } from '../opc/department-extension';
+import { intakeOpcDepartmentMessage } from '../opc/department-extension';
 import type { AppConfig } from '../config/schema';
 import {
   getAgentStopGraceMs,
@@ -675,7 +675,7 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
   // Carry the (possibly backfilled) threadId on the message so the batched
   // flush — which reads `firstMsg.threadId` for reply routing and topic scope —
   // sees it.
-  const emsg: NormalizedMessage = threadId === msg.threadId ? msg : { ...msg, threadId };
+  let emsg: NormalizedMessage = threadId === msg.threadId ? msg : { ...msg, threadId };
   // Some groups are converted into topic groups after creation. In that state
   // getChatMode can lag behind the message event shape, so threadId is the
   // stronger signal for topic-scoped sessions and reply routing.
@@ -721,7 +721,7 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     return;
   }
 
-  const opcDepartmentHandled = await tryHandleOpcDepartmentWizardReply({
+  const opcDepartmentIntake = await intakeOpcDepartmentMessage({
     channel,
     msg: emsg,
     scope,
@@ -730,10 +730,13 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     activeRuns,
     controls,
   });
-  if (opcDepartmentHandled) {
+  if (opcDepartmentIntake.action === 'handled') {
     const dropped = pending.cancel(scope);
     log.info('intake', 'opc-department', { scope, droppedPending: dropped.length });
     return;
+  }
+  if (opcDepartmentIntake.action === 'design') {
+    emsg = { ...emsg, content: opcDepartmentIntake.prompt };
   }
 
   // Group-mention policy. p2p is always unrestricted; in groups (regular and
@@ -746,6 +749,7 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
   // (`respondToMentionAll: false`), so any event reaching here is either
   // targeted or undirected chatter.
   if (
+    opcDepartmentIntake.action !== 'design' &&
     msg.chatType !== 'p2p' &&
     requireMentionForChat(controls.profileConfig, controls.cfg, msg.chatId) &&
     !msg.mentionedBot

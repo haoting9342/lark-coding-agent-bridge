@@ -1,12 +1,17 @@
 import { canRunAdminCommand } from '../policy/access';
 import { log } from '../core/logger';
+import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 let opcDepartmentBootstrapPromise: Promise<any> | undefined;
 
-async function loadOpcDepartmentBootstrap(): Promise<any | null> {
-  const entry = process.env.OPC_DEPARTMENT_RUNTIME_ENTRY;
-  if (!entry) return null;
+async function loadOpcDepartmentBootstrap(): Promise<any> {
   try {
+    const sourceEntry = join(process.cwd(), 'department-runtime', 'bootstrap.mjs');
+    const entry = existsSync(sourceEntry)
+      ? pathToFileURL(sourceEntry).href
+      : new URL('../department-runtime/bootstrap.mjs', import.meta.url).href;
     opcDepartmentBootstrapPromise ??= import(entry);
     return await opcDepartmentBootstrapPromise;
   } catch (error) {
@@ -54,17 +59,28 @@ function bridgeContext(context: any): Record<string, unknown> {
     botName: context.channel.botIdentity?.name ?? '',
     chatType: context.msg.chatType,
     chatId: context.msg.chatId,
+    scope: context.scope,
     senderId: context.msg.senderId,
     groupName:
       knownChats.find((chat: any) => chat.id === context.msg.chatId)?.name ??
       context.msg.chatId,
     text: context.msg.content,
+    messageId: context.msg.messageId,
+    currentWorkspace:
+      context.workspaces.cwdFor(context.scope) ??
+      context.controls.profileConfig.workspaces.default ??
+      null,
     isDepartmentAdmin: canRunAdminCommand(
       context.controls.profileConfig,
       context.controls,
       context.msg.senderId,
     ).ok,
-    controllerConfigPath: process.env.OPC_DEPARTMENT_CONTROLLER_CONFIG ?? '',
+    organizationRoot: join(
+      dirname(context.controls.configPath),
+      'organizations',
+      context.controls.profileConfig.organizationId ?? 'default',
+    ),
+    profileRoot: join(dirname(context.controls.configPath), 'profiles', context.controls.profile),
     activeRunCount: () => context.activeRuns.scopes().length,
     applyWorkspaceRoute: (route: { chatId: string; cwd: string }) =>
       context.workspaces.setCwd(route.chatId, route.cwd),
@@ -79,26 +95,26 @@ export async function handleOpcDepartmentCommand(
   context: any,
 ): Promise<void> {
   const bootstrap = await loadOpcDepartmentBootstrap();
-  if (!bootstrap) {
-    await reply(context, '部门控制器尚未配置。');
-    return;
-  }
   const adapted = bridgeContext(context);
   const runtime = await bootstrap.getDepartmentRuntime(adapted);
   await runtime.handleDepartmentCommand(args, adapted);
 }
 
-export async function tryHandleOpcDepartmentWizardReply(
+export type OpcDepartmentIntakeResult =
+  | { action: 'pass' }
+  | { action: 'handled' }
+  | { action: 'design'; prompt: string; bypassMention: true };
+
+export async function intakeOpcDepartmentMessage(
   context: any,
-): Promise<boolean> {
+): Promise<OpcDepartmentIntakeResult> {
   try {
     const bootstrap = await loadOpcDepartmentBootstrap();
-    if (!bootstrap) return false;
     const adapted = bridgeContext(context);
     const runtime = await bootstrap.getDepartmentRuntime(adapted);
-    return runtime.tryHandleDepartmentWizardReply(adapted);
+    return await runtime.intakeDepartmentMessage(adapted);
   } catch (error) {
-    log.fail('opc-department', error, { step: 'wizard-intake' });
-    return false;
+    log.fail('opc-department', error, { step: 'design-intake' });
+    return { action: 'pass' };
   }
 }
