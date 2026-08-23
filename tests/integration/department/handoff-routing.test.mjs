@@ -72,4 +72,13 @@ describe('multi-host handoff routing', () => {
     ]);
     expect(spawnSync.mock.calls[0][2]).toMatchObject({ shell: false });
   });
+
+  it('rejects an SSH target that could be parsed as an option', () => {
+    expect(() => new RestrictedSshHandoffAdapter({
+      identityFile: '/private/department-key',
+      hostAlias: '-oProxyCommand',
+      departmentId: 'media_content',
+      nodeId: 'mac_aux',
+    })).toThrow(/hostAlias is invalid/);
+  });
 });

@@ -75,11 +75,13 @@ describe('clean npm install contract', () => {
 
     const forbidden = /OPC_DEPARTMENT_RUNTIME_ENTRY|OPC_DEPARTMENT_CONTROLLER_CONFIG|opc-company|\/Users\/crystal|\/home\/hao/i;
     const legacyExecutable = /\blark-channel-bridge(?!-department)\s+(?:run|start|stop|restart|status|ui|ps|kill|secrets)\b/i;
+    const legacyWizard = /请发送部门主要职责|当前旧版 0\.5 bridge|waiting_restart/;
     for (const file of walk(packageRoot)) {
       if (statSync(file).size > 5 * 1024 * 1024) continue;
       const content = readFileSync(file, 'utf8');
       expect(content, path.relative(packageRoot, file)).not.toMatch(forbidden);
       expect(content, path.relative(packageRoot, file)).not.toMatch(legacyExecutable);
+      expect(content, path.relative(packageRoot, file)).not.toMatch(legacyWizard);
     }
   }, 240_000);
 });

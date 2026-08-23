@@ -2,7 +2,7 @@ import { classifyDepartmentConfirmation } from "./department-confirmation.mjs";
 import { buildDepartmentDesignPrompt } from "./department-design-prompt.mjs";
 import { DepartmentDesignStoreError } from "./department-design-store.mjs";
 import { assertDepartmentDraft } from "./department-draft-schema.mjs";
-import { deriveDepartmentId } from "./department-wizard.mjs";
+import { deriveDepartmentId } from "./department-id.mjs";
 
 const DEPARTMENT_COMMAND = /^\/department(?:\s|$)/i;
 const NATURAL_PAUSE = new Set(["暂停创建部门", "暂停部门创建"]);
@@ -89,8 +89,6 @@ export class DepartmentCommandRuntime {
     draftCli,
     storeFile,
     applyWorkspaceRoute = () => {},
-    restartCoordinator = { request: () => {} },
-    resolveRestartStatus = () => null,
     log = () => {},
   }) {
     this.designStore = designStore;
@@ -100,8 +98,6 @@ export class DepartmentCommandRuntime {
     this.draftCli = draftCli;
     this.storeFile = storeFile;
     this.applyWorkspaceRoute = applyWorkspaceRoute;
-    this.restartCoordinator = restartCoordinator;
-    this.resolveRestartStatus = resolveRestartStatus;
     this.log = log;
   }
 
@@ -161,13 +157,7 @@ export class DepartmentCommandRuntime {
     }
 
     if (subcommand === "status") {
-      const restartStatus = state?.transactionId
-        ? this.resolveRestartStatus(state.transactionId)
-        : null;
-      safeReply(
-        context,
-        restartStatus ? `${summary(state)}\n重启状态：${restartStatus.status}。` : summary(state),
-      );
+      safeReply(context, summary(state));
       return true;
     }
 
@@ -318,25 +308,6 @@ export class DepartmentCommandRuntime {
     };
   }
 
-  tryHandleDepartmentWizardReply(context) {
-    const result = this.intakeDepartmentMessage(context);
-    if (result.action === "pass") return false;
-    if (result.action === "handled") return true;
-    const state = this.designStore.getFor(context);
-    if (state && ACTIVE_DESIGN_STATUSES.has(state.status)) {
-      this.designStore.pause(state.key, {
-        actorId: "system",
-        source: "controller",
-        reason: "legacy 0.5 bridge cannot carry guarded AI design prompts",
-      });
-    }
-    safeReply(
-      context,
-      "当前旧版 0.5 bridge 无法安全承载 AI 部门设计提示，创建流程已暂停且草案已保留。恢复 0.7 部门扩展后可继续。",
-    );
-    return true;
-  }
-
   #provision(state, context, confirmationText) {
     let draft;
     try {
@@ -377,10 +348,6 @@ export class DepartmentCommandRuntime {
       });
       if (result.workspaceRouteApplied !== true) this.applyWorkspaceRoute(result.workspaceRoute);
       this.designStore.completeProvisioning(state.key, {
-        transactionId: result.transactionId,
-        receiptPath: result.receiptPath,
-      });
-      this.restartCoordinator.request({
         transactionId: result.transactionId,
         receiptPath: result.receiptPath,
       });

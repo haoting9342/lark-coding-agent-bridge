@@ -18,6 +18,8 @@ interface BaseOptions {
   output?: (line: string) => void;
 }
 
+const FORCED_HANDOFF_COMMAND = /^lark-channel-bridge-department organization handoff-operation ([a-z][a-z0-9_]*) ([a-z][a-z0-9_]*) (claim|accept|progress|complete|receipt|fail|silence)$/;
+
 export interface NodePlanOptions extends BaseOptions {
   hostAlias: string;
   capabilities?: string[];
@@ -97,6 +99,36 @@ function departmentRuntimeEntry(name: string): string {
   const source = join(process.cwd(), 'department-runtime', name);
   if (existsSync(source)) return pathToFileURL(source).href;
   return new URL(`../department-runtime/${name}`, import.meta.url).href;
+}
+
+export function parseForcedHandoffCommand(
+  originalCommand: string,
+  expectedNodeId: string,
+): { departmentId: string; nodeId: string; operation: string } {
+  if (!/^[a-z][a-z0-9_]*$/.test(expectedNodeId)) throw new Error('paired node id is invalid');
+  if (typeof originalCommand !== 'string' || originalCommand.length > 512) {
+    throw new Error('forced handoff command is invalid');
+  }
+  const match = FORCED_HANDOFF_COMMAND.exec(originalCommand);
+  if (!match) throw new Error('forced handoff command is invalid');
+  const [, departmentId, nodeId, operation] = match;
+  if (!departmentId || !nodeId || !operation) throw new Error('forced handoff command is invalid');
+  if (nodeId !== expectedNodeId) throw new Error('forced handoff command targets another paired node');
+  return { departmentId, nodeId, operation };
+}
+
+export async function runOrganizationHandoffServe(
+  expectedNodeId: string,
+  options: BaseOptions & { input?: string; originalCommand?: string } = {},
+): Promise<unknown> {
+  const command = options.originalCommand ?? process.env.SSH_ORIGINAL_COMMAND ?? '';
+  const parsed = parseForcedHandoffCommand(command, expectedNodeId);
+  return runOrganizationHandoffOperation(
+    parsed.departmentId,
+    parsed.nodeId,
+    parsed.operation,
+    options,
+  );
 }
 
 export async function runOrganizationHandoffOperation(

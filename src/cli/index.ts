@@ -27,6 +27,7 @@ import { runUi } from './commands/ui';
 import { runOrganizationDoctor, runOrganizationStatus } from './commands/organization';
 import {
   runOrganizationHandoffOperation,
+  runOrganizationHandoffServe,
   runOrganizationHandoffStatus,
   runOrganizationHandoffSubmit,
   runOrganizationNodeList,
@@ -140,6 +141,13 @@ organizationNode
       bridgeProfile: opts.profile,
       workspace: opts.workspace,
     });
+  });
+
+organization
+  .command('handoff-serve <node-id>')
+  .description('Serve one paired node through an SSH forced-command allowlist')
+  .action(async (nodeId: string) => {
+    await runOrganizationHandoffServe(nodeId);
   });
 
 organization

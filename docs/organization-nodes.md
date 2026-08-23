@@ -35,7 +35,7 @@ The primary node owns user conversation, governance, planning and final synthesi
      --workspace /absolute/department/workspace
    ```
 
-The plan's `forcedCommand` is a template. Replace its department and operation placeholders in the restricted SSH configuration appropriate for the deployment. Do not expose the general bridge CLI as an unrestricted remote shell.
+Copy the plan's `forcedCommand` verbatim into the dedicated key's restricted SSH configuration. It dispatches only the original bridge handoff command for that paired node; it rejects another node, an unknown operation, extra arguments and shell syntax. Do not expose the general bridge CLI as an unrestricted remote shell.
 
 ## Handoff behavior
 
@@ -43,4 +43,4 @@ The department's confirmed topology and task execution policy decide whether wor
 
 Handoffs use an append-only ledger with task IDs, progress and receipts. Inputs reject raw commands, secrets, session data and oversized payloads. Auxiliary execution is selected from a fixed operation registry; arbitrary shell commands are not accepted. The primary node reads the receipt and produces the final user-facing synthesis.
 
-Low-level diagnostics are available through `organization handoff-submit`, `organization handoff-status` and the restricted `organization handoff-operation` endpoint. These are infrastructure interfaces, not normal chat commands.
+Low-level diagnostics are available through `organization handoff-submit`, `organization handoff-status` and the restricted `organization handoff-operation` endpoint. `organization handoff-serve` is only the fixed OpenSSH forced-command dispatcher and must not be invoked as a normal chat command.

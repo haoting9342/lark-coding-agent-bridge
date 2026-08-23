@@ -1,6 +1,7 @@
 import { spawnSync as defaultSpawnSync } from 'node:child_process';
 
 const ID = /^[a-z][a-z0-9_.:-]*$/;
+const SSH_TARGET = /^(?:[A-Za-z0-9][A-Za-z0-9._-]*@)?[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const OPERATION = new Set(['claim', 'accept', 'progress', 'complete', 'fail', 'cancel', 'receipt', 'silence']);
 const NO_AUTOMATIC_FAILOVER_RISKS = new Set(['identity_bound', 'publishing', 'high']);
 
@@ -123,7 +124,7 @@ export class RestrictedSshHandoffAdapter {
     if (typeof identityFile !== 'string' || !identityFile.startsWith('/') || identityFile.includes('\0')) {
       throw new HandoffTransportError('identityFile must be absolute');
     }
-    if (typeof hostAlias !== 'string' || !/^[A-Za-z0-9._@-]+$/.test(hostAlias)) {
+    if (typeof hostAlias !== 'string' || !SSH_TARGET.test(hostAlias)) {
       throw new HandoffTransportError('hostAlias is invalid');
     }
     if (!ID.test(departmentId) || !ID.test(nodeId)) {

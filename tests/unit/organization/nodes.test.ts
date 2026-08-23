@@ -54,9 +54,21 @@ describe('organization node registry', () => {
     expect(plan.role).toBe('auxiliary');
     expect(plan.authority).toBe('execution_only');
     expect(plan.identityFile).toContain('nodes/identities/mac_aux');
-    expect(plan.forcedCommand).toContain('lark-channel-bridge-department organization handoff-operation');
+    expect(plan.forcedCommand).toBe(
+      'lark-channel-bridge-department organization handoff-serve mac_aux',
+    );
     expect(existsSync(plan.identityFile)).toBe(false);
     expect(existsSync(join(h.organizationRoot, 'nodes'))).toBe(false);
+  });
+
+  it('rejects host aliases that SSH could parse as options', () => {
+    const h = fixture();
+    expect(() => planAuxiliaryNodeInvite({
+      organizationRoot: h.organizationRoot,
+      nodeId: 'mac_aux',
+      hostAlias: '-oProxyCommand',
+      capabilities: [],
+    })).toThrow(/host alias is invalid/);
   });
 
   it('allows only the primary to register an execution-only auxiliary node', async () => {
@@ -81,6 +93,13 @@ describe('organization node registry', () => {
       plan,
       identityPublicKeyFingerprint: 'SHA256:aux',
     })).rejects.toThrow(/primary.*register/i);
+
+    await expect(registerAuxiliaryNode({
+      organizationRoot: h.organizationRoot,
+      actorNodeId: 'local_primary',
+      plan: { ...plan, hostAlias: '-oProxyCommand' },
+      identityPublicKeyFingerprint: 'SHA256:aux',
+    })).rejects.toThrow(/host alias is invalid/);
 
     await registerAuxiliaryNode({
       organizationRoot: h.organizationRoot,

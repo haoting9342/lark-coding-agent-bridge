@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 
 export interface NodeRegistryEntry {
   id: string;
@@ -37,7 +37,7 @@ export interface AuxiliaryNodeInvitePlan {
 }
 
 const NODE_ID = /^[a-z][a-z0-9_]*$/;
-const HOST_ALIAS = /^[A-Za-z0-9._@-]+$/;
+const HOST_ALIAS = /^(?:[A-Za-z0-9][A-Za-z0-9._-]*@)?[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 function validateNodeId(value: string, label = 'node id'): void {
   if (!NODE_ID.test(value)) throw new Error(`${label} is invalid`);
@@ -112,7 +112,7 @@ export async function ensureLocalPrimaryNode(input: {
   if (typeof input.bridgeProfile !== 'string' || !input.bridgeProfile.trim()) {
     throw new Error('bridge profile is required');
   }
-  if (typeof input.workspace !== 'string' || !input.workspace.startsWith('/')) {
+  if (typeof input.workspace !== 'string' || !isAbsolute(input.workspace)) {
     throw new Error('workspace must be absolute');
   }
   const now = input.now ?? (() => new Date());
@@ -163,8 +163,7 @@ export function planAuxiliaryNodeInvite(input: {
     capabilities: validateCapabilities(input.capabilities ?? []),
     adapterId: 'restricted_ssh_pull',
     identityFile,
-    forcedCommand:
-      `lark-channel-bridge-department organization handoff-operation <department-id> ${input.nodeId} <operation>`,
+    forcedCommand: `lark-channel-bridge-department organization handoff-serve ${input.nodeId}`,
   };
 }
 
@@ -177,6 +176,9 @@ export async function registerAuxiliaryNode(input: {
 }): Promise<NodeRegistryEntry> {
   validateNodeId(input.actorNodeId, 'actor node id');
   validateNodeId(input.plan?.nodeId);
+  if (typeof input.plan?.hostAlias !== 'string' || !HOST_ALIAS.test(input.plan.hostAlias)) {
+    throw new Error('host alias is invalid');
+  }
   if (typeof input.identityPublicKeyFingerprint !== 'string' || !/^SHA256:[A-Za-z0-9+/=_-]+$/.test(input.identityPublicKeyFingerprint)) {
     throw new Error('identity public key fingerprint is invalid');
   }
@@ -229,7 +231,7 @@ export async function activateAuxiliaryNode(input: {
   if (typeof input.bridgeProfile !== 'string' || !input.bridgeProfile.trim()) {
     throw new Error('bridge profile is required');
   }
-  if (typeof input.workspace !== 'string' || !input.workspace.startsWith('/')) {
+  if (typeof input.workspace !== 'string' || !isAbsolute(input.workspace)) {
     throw new Error('workspace must be absolute');
   }
   const now = input.now ?? (() => new Date());
