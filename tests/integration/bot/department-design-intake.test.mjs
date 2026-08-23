@@ -73,9 +73,9 @@ describe('exclusive conversational department design', () => {
     expect(designStore.getFor(context).status).toBe('active');
   });
 
-  it('does not load an external runtime through OPC environment variables', async () => {
+  it('loads only the bundled department runtime', async () => {
     const source = await import('node:fs/promises').then(({ readFile }) =>
-      readFile(path.join(process.cwd(), 'src', 'opc', 'department-extension.ts'), 'utf8'));
+      readFile(path.join(process.cwd(), 'src', 'department', 'department-extension.ts'), 'utf8'));
     expect(source).not.toContain('OPC_DEPARTMENT_RUNTIME_ENTRY');
     expect(source).not.toContain('OPC_DEPARTMENT_CONTROLLER_CONFIG');
     expect(source).toContain('department-runtime/bootstrap.mjs');

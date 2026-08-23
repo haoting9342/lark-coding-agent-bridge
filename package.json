@@ -1,7 +1,7 @@
 {
   "name": "lark-channel-bridge-department",
   "version": "0.7.0",
-  "description": "Bridge Feishu/Lark messenger with local CLI coding agents",
+  "description": "Feishu/Lark bridge with conversational department design and multi-agent organization management",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "publishConfig": {
@@ -10,12 +10,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zarazhangrui/feishu-claude-code-bridge.git"
+    "url": "git+https://github.com/haoting9342/lark-coding-agent-bridge.git"
   },
   "bugs": {
-    "url": "https://github.com/zarazhangrui/feishu-claude-code-bridge/issues"
+    "url": "https://github.com/haoting9342/lark-coding-agent-bridge/issues"
   },
-  "homepage": "https://github.com/zarazhangrui/feishu-claude-code-bridge#readme",
+  "homepage": "https://github.com/haoting9342/lark-coding-agent-bridge#readme",
   "bin": {
     "lark-channel-bridge-department": "./bin/lark-channel-bridge-department.mjs"
   },
@@ -28,6 +28,10 @@
   "files": [
     "dist",
     "bin",
+    "department-runtime",
+    "assets/organization-template",
+    "docs/department-creation.md",
+    "docs/organization-nodes.md",
     "README.md",
     "README.zh.md",
     "LICENSE"
@@ -42,6 +46,7 @@
     "test:unit": "vitest run tests/unit --passWithNoTests",
     "test:integration": "vitest run tests/integration --passWithNoTests",
     "test:process": "vitest run tests/process --passWithNoTests",
+    "test:package": "vitest run tests/packaging/clean-install.test.mjs",
     "ci:local": "git diff --check && pnpm test && pnpm typecheck && pnpm build",
     "ci:platform": "pnpm test && pnpm typecheck && pnpm build",
     "prepare": "npm run build",
@@ -106,7 +111,10 @@
     "codex",
     "cli",
     "channel",
-    "bridge"
+    "bridge",
+    "department",
+    "multi-agent",
+    "organization"
   ],
   "license": "MIT"
 }

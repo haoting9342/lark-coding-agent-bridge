@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import pkg from '../../package.json';
 import { formatAgentPreflightDiagnostic, getAgentPreflightDiagnostic } from '../agent/preflight';
-import { runMigrate } from './commands/migrate';
 import { runKillCli, runPs } from './commands/ps';
 import {
   runSecretsGet,
@@ -40,7 +39,7 @@ const program = new Command();
 
 program
   .name('lark-channel-bridge-department')
-  .description('Bridge Feishu/Lark messenger with local CLI coding agents')
+  .description('Feishu/Lark bridge with conversational department organization management')
   .version(pkg.version, '-v, --version');
 
 // === process-level commands (work directly on bridge processes) ===
@@ -69,16 +68,6 @@ program
     skipCheckLarkCli?: boolean;
   }) => {
     await runStart(opts);
-  });
-
-program
-  .command('migrate')
-  .description('Migrate legacy bridge config/state into the current profile layout')
-  .option('-c, --config <path>', 'path to config file')
-  .option('--profile <name>', 'target profile name for legacy v1 config migration')
-  .option('--agent <kind>', 'agent kind for legacy v1 profile migration (claude or codex)')
-  .action(async (opts: { config?: string; profile?: string; agent?: string }) => {
-    await runMigrate(opts);
   });
 
 const profile = program
@@ -323,7 +312,7 @@ program
 
 const secrets = program
   .command('secrets')
-  .description('Manage the bridge\'s encrypted secret keystore (~/.lark-channel/secrets.enc)');
+  .description('Manage the bridge\'s encrypted secret keystore (~/.lark-channel-department/profiles/<profile>/secrets.enc)');
 
 secrets
   .command('get')

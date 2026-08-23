@@ -86,7 +86,7 @@ import { answerInMeeting, meetingScopeId } from '../meeting/orchestrator';
 import type { MeetingSession } from '../meeting/session';
 import { hasStructuredLarkCliUserAuth } from '../lark-cli/identity-policy';
 
-import { handleOpcDepartmentCommand } from '../opc/department-extension';
+import { handleDepartmentCommand } from '../department/department-extension';
 
 export interface Controls {
   profile: string;
@@ -169,7 +169,7 @@ const AUDIT_SAFE_COMMAND_REPLY = '命令已处理。';
 const RESUME_APPLIED_REPLY = '已完成，请继续发送下一条消息。';
 
 const handlers: Record<string, Handler> = {
-  '/department': handleOpcDepartmentCommand,
+  '/department': handleDepartmentCommand,
   '/new': handleNew,
   '/reset': handleNew,
   '/cd': handleCd,

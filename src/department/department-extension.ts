@@ -5,18 +5,18 @@ import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { pathToFileURL } from 'node:url';
 
-let opcDepartmentBootstrapPromise: Promise<any> | undefined;
+let departmentBootstrapPromise: Promise<any> | undefined;
 
-async function loadOpcDepartmentBootstrap(): Promise<any> {
+async function loadDepartmentBootstrap(): Promise<any> {
   try {
     const sourceEntry = join(process.cwd(), 'department-runtime', 'bootstrap.mjs');
     const entry = existsSync(sourceEntry)
       ? pathToFileURL(sourceEntry).href
       : new URL('../department-runtime/bootstrap.mjs', import.meta.url).href;
-    opcDepartmentBootstrapPromise ??= import(entry);
-    return await opcDepartmentBootstrapPromise;
+    departmentBootstrapPromise ??= import(entry);
+    return await departmentBootstrapPromise;
   } catch (error) {
-    opcDepartmentBootstrapPromise = undefined;
+    departmentBootstrapPromise = undefined;
     throw error;
   }
 }
@@ -48,7 +48,7 @@ async function reply(context: any, text: unknown): Promise<void> {
       commandReplyOptions(context),
     );
   } catch (error) {
-    log.fail('opc-department', error, { step: 'reply' });
+    log.fail('department', error, { step: 'reply' });
   }
 }
 
@@ -92,38 +92,38 @@ function bridgeContext(context: any): Record<string, unknown> {
     },
     reply: (text: unknown) => reply(context, text),
     log: (payload: unknown) =>
-      log.info('opc-department', 'runtime', runtimeLogFields(payload)),
+      log.info('department', 'runtime', runtimeLogFields(payload)),
   };
 }
 
-export async function handleOpcDepartmentCommand(
+export async function handleDepartmentCommand(
   args: string,
   context: any,
 ): Promise<void> {
-  const bootstrap = await loadOpcDepartmentBootstrap();
+  const bootstrap = await loadDepartmentBootstrap();
   const adapted = bridgeContext(context);
   const runtime = await bootstrap.getDepartmentRuntime(adapted);
   await runtime.handleDepartmentCommand(args, adapted);
 }
 
-export type OpcDepartmentIntakeResult =
+export type DepartmentIntakeResult =
   | { action: 'pass' }
   | { action: 'handled' }
   | { action: 'design'; prompt: string; bypassMention: true };
 
-export async function intakeOpcDepartmentMessage(
+export async function intakeDepartmentMessage(
   context: any,
-): Promise<OpcDepartmentIntakeResult> {
+): Promise<DepartmentIntakeResult> {
   if (context.msg.chatType !== 'group' && context.msg.chatType !== 'group_chat') {
     return { action: 'pass' };
   }
   try {
-    const bootstrap = await loadOpcDepartmentBootstrap();
+    const bootstrap = await loadDepartmentBootstrap();
     const adapted = bridgeContext(context);
     const runtime = await bootstrap.getDepartmentRuntime(adapted);
     return await runtime.intakeDepartmentMessage(adapted);
   } catch (error) {
-    log.fail('opc-department', error, { step: 'design-intake' });
+    log.fail('department', error, { step: 'design-intake' });
     return { action: 'pass' };
   }
 }

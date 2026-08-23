@@ -30,7 +30,7 @@ import {
 } from '../card/run-state';
 import { renderText } from '../card/text-renderer';
 import { tryHandleCommand, type Controls } from '../commands';
-import { intakeOpcDepartmentMessage } from '../opc/department-extension';
+import { intakeDepartmentMessage } from '../department/department-extension';
 import type { AppConfig } from '../config/schema';
 import {
   getAgentStopGraceMs,
@@ -237,7 +237,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
       cfg.accounts.app.tenant === 'lark'
         ? 'https://open.larksuite.com'
         : 'https://open.feishu.cn',
-    source: 'lark-channel-bridge',
+    source: 'lark-channel-bridge-department',
     logger: buildQuietLogger(),
     policy: {
       dmMode: 'open',
@@ -722,7 +722,7 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     return;
   }
 
-  const opcDepartmentIntake = await intakeOpcDepartmentMessage({
+  const departmentIntake = await intakeDepartmentMessage({
     channel,
     msg: emsg,
     scope,
@@ -731,13 +731,13 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     activeRuns,
     controls,
   });
-  if (opcDepartmentIntake.action === 'handled') {
+  if (departmentIntake.action === 'handled') {
     const dropped = pending.cancel(scope);
-    log.info('intake', 'opc-department', { scope, droppedPending: dropped.length });
+    log.info('intake', 'department', { scope, droppedPending: dropped.length });
     return;
   }
-  if (opcDepartmentIntake.action === 'design') {
-    emsg = { ...emsg, content: opcDepartmentIntake.prompt };
+  if (departmentIntake.action === 'design') {
+    emsg = { ...emsg, content: departmentIntake.prompt };
   }
 
   // Group-mention policy. p2p is always unrestricted; in groups (regular and
@@ -750,7 +750,7 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
   // (`respondToMentionAll: false`), so any event reaching here is either
   // targeted or undirected chatter.
   if (
-    opcDepartmentIntake.action !== 'design' &&
+    departmentIntake.action !== 'design' &&
     msg.chatType !== 'p2p' &&
     requireMentionForChat(controls.profileConfig, controls.cfg, msg.chatId) &&
     !msg.mentionedBot

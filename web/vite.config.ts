@@ -10,6 +10,13 @@ import { fileURLToPath } from 'node:url';
 // deps (works offline).
 export default defineConfig({
   plugins: [react(), tailwindcss(), viteSingleFile()],
+  // 发布包测试由 Vitest 发起，此时 NODE_ENV=test。无论调用方环境如何，
+  // 都禁止把 JSX 调试信息和构建机绝对路径写入内联控制台。
+  oxc: {
+    jsx: {
+      development: false,
+    },
+  },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

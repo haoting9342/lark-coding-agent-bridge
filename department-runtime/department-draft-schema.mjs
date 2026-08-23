@@ -1,4 +1,5 @@
 import path from "node:path";
+import os from "node:os";
 
 const COMMON_FIELDS = new Set([
   "departmentName",
@@ -43,22 +44,17 @@ export const ALLOWED_DRAFT_FIELDS = new Set([
   ...PERMANENT_FIELDS,
   ...PROJECT_FIELDS,
 ]);
+const USER_HOME = path.resolve(os.homedir());
 const DANGEROUS_EXACT_ROOTS = new Set([
-  "/",
-  "/home",
-  "/home/hao",
-  "/Users",
-  "/Users/crystal",
+  path.parse(USER_HOME).root,
+  path.dirname(USER_HOME),
+  USER_HOME,
 ]);
 const DANGEROUS_PREFIXES = [
-  "/home/hao/.lark-channel",
-  "/home/hao/.codex",
-  "/home/hao/.ssh",
-  "/home/hao/.local/share/opc-company",
-  "/Users/crystal/.lark-channel",
-  "/Users/crystal/.codex",
-  "/Users/crystal/.ssh",
-  "/Users/crystal/.local/share/opc-company/bridge-extension",
+  path.resolve(process.env.LARK_CHANNEL_DEPARTMENT_HOME ?? path.join(USER_HOME, ".lark-channel-department")),
+  path.join(USER_HOME, ".lark-channel"),
+  path.join(USER_HOME, ".codex"),
+  path.join(USER_HOME, ".ssh"),
 ];
 const PERMANENT_LIFECYCLES = new Set(["draft", "active", "suspended", "retired"]);
 const PROJECT_LIFECYCLES = new Set([

@@ -1,0 +1,48 @@
+name: Department bridge release
+
+on:
+  push:
+    tags:
+      - 'department-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify
+        run: pnpm ci:platform
+
+      - name: Pack
+        run: |
+          mkdir -p release
+          pnpm pack --pack-destination release
+          cd release
+          sha256sum *.tgz > SHA256SUMS
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${GITHUB_REF_NAME}"
+          release/*.tgz release/SHA256SUMS
+          --verify-tag
+          --title "lark-channel-bridge-department ${GITHUB_REF_NAME#department-}"
+          --generate-notes

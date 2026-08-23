@@ -99,7 +99,7 @@ export function windowsLauncherCmdPath(profile: string = paths.profile): string 
 
 /**
  * Daemon stdout/stderr go alongside the bridge's own structured logs in
- * `~/.lark-channel/logs/` so users only need to remember one path. Filenames
+ * `~/.lark-channel-department/profiles/<profile>/logs/` so users only need to remember one root. Filenames
  * are `daemon-*` to keep them distinct from the rolling per-day JSON files.
  */
 export function daemonLogDir(profile: string = paths.profile): string {
