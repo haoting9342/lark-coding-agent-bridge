@@ -79,6 +79,44 @@ lark-channel-bridge-department ps
 lark-channel-bridge-department --help
 ```
 
+## Bridge 基础运行约定
+
+每个 Profile 可以作为独立的 per-profile service 运行，也可以由一个 supervisor 托管多个 Profile。`workspaces.default` 是当前 Profile 的默认工作区。访问名单可直接在飞书维护：
+
+```text
+/invite user <open_id>
+/remove user <open_id>
+/invite group <chat_id>
+/remove group <chat_id>
+/invite all group
+```
+
+Profile 的归档和导出都需要显式命令：
+
+```bash
+lark-channel-bridge-department profile remove <name>
+lark-channel-bridge-department profile remove <name> --purge --yes
+lark-channel-bridge-department profile export <name>
+lark-channel-bridge-department profile export <name> --include-secrets --yes
+```
+
+lark-cli 身份策略按 Profile 隔离。每个 Agent 使用当前 profile 的 lark-cli 目录，一个 Profile 的个人飞书授权不会共享给另一个。Windows 后台服务使用自动生成的 `.cmd` 启动器。
+
+云文档评论按文档权限生效：机器人能否读取和回复由该文档的飞书权限及明确 @ 决定，不套用群聊访问名单。
+
+新配置统一使用 `permissions` 约束 Agent 的默认和最高访问级别：
+
+```json
+{
+  "permissions": {
+    "defaultAccess": "full",
+    "maxAccess": "full"
+  }
+}
+```
+
+旧版 `sandbox` 仅为迁移兼容继续可读，新配置不应再使用。
+
 这个发行版是在原 Bridge 基础上构建、拥有独立产品名和状态目录的部门版；原版 Bridge 仍可独立保留。
 
 ## 开发验证

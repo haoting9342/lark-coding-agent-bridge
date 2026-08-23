@@ -79,6 +79,44 @@ lark-channel-bridge-department ps
 lark-channel-bridge-department --help
 ```
 
+## Base bridge operations
+
+Each profile can run as a per-profile service, or several profiles can share the supervisor. `workspaces.default` is the profile's fallback working directory. Access lists can be maintained from Feishu without editing JSON directly:
+
+```text
+/invite user <open_id>
+/remove user <open_id>
+/invite group <chat_id>
+/remove group <chat_id>
+/invite all group
+```
+
+Profiles can be archived or exported explicitly:
+
+```bash
+lark-channel-bridge-department profile remove <name>
+lark-channel-bridge-department profile remove <name> --purge --yes
+lark-channel-bridge-department profile export <name>
+lark-channel-bridge-department profile export <name> --include-secrets --yes
+```
+
+The lark-cli identity policy is profile-isolated. Every profile uses a profile-local lark-cli directory, so one profile's personal Feishu authorization is not shared with another. Windows service helpers use a generated `.cmd` launcher.
+
+Cloud-doc comments are document-scoped: whether the bot may read and reply follows that document's Feishu permissions and an explicit mention, not the group access list.
+
+Canonical agent access limits use `permissions` in the profile configuration:
+
+```json
+{
+  "permissions": {
+    "defaultAccess": "full",
+    "maxAccess": "full"
+  }
+}
+```
+
+The legacy `sandbox` form remains readable for migration but should not be used in new configuration.
+
 The original bridge remains available upstream; this distribution is the independently named department product built from that bridge foundation.
 
 ## Development
