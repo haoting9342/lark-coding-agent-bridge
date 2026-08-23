@@ -127,7 +127,7 @@ export async function withConfigFileLock<T>(configPath: string, fn: () => Promis
 
 export async function readActiveProfile(rootDir?: string): Promise<string | undefined> {
   const activeProfileFile = join(
-    rootDir ?? process.env.LARK_CHANNEL_HOME ?? resolveAppPaths().rootDir,
+    rootDir ?? process.env.LARK_CHANNEL_DEPARTMENT_HOME ?? resolveAppPaths().rootDir,
     'active-profile',
   );
   try {

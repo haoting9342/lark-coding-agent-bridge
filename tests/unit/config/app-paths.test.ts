@@ -54,20 +54,28 @@ describe('resolveAppPaths', () => {
     expect(paths.secretsGetterScript).toBe(join(root, 'secrets-getter'));
   });
 
-  it('uses LARK_CHANNEL_HOME only for the root directory, not profile selection', async () => {
+  it('uses only LARK_CHANNEL_DEPARTMENT_HOME for the product root', async () => {
     const root = await tempRoot();
-    const prev = process.env.LARK_CHANNEL_HOME;
-    process.env.LARK_CHANNEL_HOME = root;
+    const upstreamRoot = await tempRoot();
+    const previousDepartment = process.env.LARK_CHANNEL_DEPARTMENT_HOME;
+    const previousUpstream = process.env.LARK_CHANNEL_HOME;
+    process.env.LARK_CHANNEL_DEPARTMENT_HOME = root;
+    process.env.LARK_CHANNEL_HOME = upstreamRoot;
     try {
       const paths = resolveAppPaths({ profile: 'operator-choice' });
       expect(paths.rootDir).toBe(root);
       expect(paths.profile).toBe('operator-choice');
       expect(paths.profileDir).toBe(join(root, 'profiles', 'operator-choice'));
     } finally {
-      if (prev === undefined) {
+      if (previousDepartment === undefined) {
+        delete process.env.LARK_CHANNEL_DEPARTMENT_HOME;
+      } else {
+        process.env.LARK_CHANNEL_DEPARTMENT_HOME = previousDepartment;
+      }
+      if (previousUpstream === undefined) {
         delete process.env.LARK_CHANNEL_HOME;
       } else {
-        process.env.LARK_CHANNEL_HOME = prev;
+        process.env.LARK_CHANNEL_HOME = previousUpstream;
       }
     }
   });

@@ -61,7 +61,7 @@ RestartSec=5
 StandardOutput=append:${daemonStdoutPath(inputs.profile)}
 StandardError=append:${daemonStderrPath(inputs.profile)}
 Environment="PATH=${escape(inputs.envPath)}"
-Environment="LARK_CHANNEL_HOME=${escape(inputs.channelHome)}"
+Environment="LARK_CHANNEL_DEPARTMENT_HOME=${escape(inputs.channelHome)}"
 
 [Install]
 WantedBy=default.target

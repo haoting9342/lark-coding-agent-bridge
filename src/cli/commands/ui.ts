@@ -18,7 +18,7 @@ export interface RunUiOptions {
  * the user to start one.
  */
 export async function runUi(opts: RunUiOptions = {}): Promise<void> {
-  const rootDir = process.env.LARK_CHANNEL_HOME;
+  const rootDir = process.env.LARK_CHANNEL_DEPARTMENT_HOME;
   const appPaths = resolveAppPaths({ rootDir });
 
   const sidecar = await readUiSidecar(appPaths.hostUiFile);

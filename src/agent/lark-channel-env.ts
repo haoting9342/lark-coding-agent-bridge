@@ -16,7 +16,13 @@ export function buildLarkChannelEnv(context?: LarkChannelEnvContext): NodeJS.Pro
   if (profile) env.LARK_CHANNEL_PROFILE = profile;
 
   const rootDir = nonEmpty(context?.rootDir);
-  if (rootDir) env.LARK_CHANNEL_HOME = rootDir;
+  if (rootDir) {
+    env.LARK_CHANNEL_DEPARTMENT_HOME = rootDir;
+    // lark-cli and existing Agent Skills still use the upstream channel-home
+    // variable as their execution context contract. The department bridge
+    // itself resolves state only from LARK_CHANNEL_DEPARTMENT_HOME.
+    env.LARK_CHANNEL_HOME = rootDir;
+  }
 
   const configPath =
     nonEmpty(context?.larkCliSourceConfigFile) ??

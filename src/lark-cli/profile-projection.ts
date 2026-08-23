@@ -55,6 +55,7 @@ async function buildProjectionSecrets(
       args: [],
       env: {
         ...(existing?.env ?? {}),
+        LARK_CHANNEL_DEPARTMENT_HOME: appPaths.rootDir,
         LARK_CHANNEL_HOME: appPaths.rootDir,
         LARK_CHANNEL_PROFILE: appPaths.profile,
       },

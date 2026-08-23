@@ -85,9 +85,10 @@ describe('writeLarkCliSourceProjection', () => {
             source: 'exec',
             command: expectedSecretsGetterWrapper(appPaths.secretsGetterScript),
             args: [],
-            env: {
-              LARK_CHANNEL_HOME: root,
-              LARK_CHANNEL_PROFILE: 'codex-dev',
+          env: {
+            LARK_CHANNEL_DEPARTMENT_HOME: root,
+            LARK_CHANNEL_HOME: root,
+            LARK_CHANNEL_PROFILE: 'codex-dev',
             },
           },
         },
