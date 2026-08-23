@@ -1,5 +1,6 @@
 import { mkdir, readFile, realpath } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { hostname } from 'node:os';
 import * as p from '@clack/prompts';
 import { runRegistrationWizard } from '../bot/wizard';
 import { detectInstalledAgents, type DetectedAgent } from '../cli/agent-detection';
@@ -52,6 +53,8 @@ import {
 } from '../lark-cli/legacy-source-overlay';
 import { validateAppCredentials } from '../utils/feishu-auth';
 import { ensureDefaultOrganization } from '../organization/initializer';
+import { organizationRoot } from '../organization/paths';
+import { ensureLocalPrimaryNode } from '../organization/nodes';
 
 export interface ResolveProfileRuntimeOptions {
   config?: string;
@@ -183,7 +186,7 @@ export async function resolveProfileRuntime(
     }
     assertBootstrapAppMatchesExistingProfile(opts, profile, profileConfig);
     const cfg = await maybeMigrateRootPlaintextSecret(rootConfig, profile, appPaths, configPath);
-    return { cfg, profileConfig, configPath, appPaths, profile };
+    return finalizeProfileRuntime({ cfg, profileConfig, configPath, appPaths, profile });
   }
 
   const existing = await loadConfig(configPath);
@@ -200,7 +203,9 @@ export async function resolveProfileRuntime(
     const root = createRootConfig(profile, profileConfig, cfg.secrets);
     await saveRootConfig(root, configPath);
     await writeActiveProfile(appPaths.rootDir, profile);
-    return { cfg: runtimeProfileConfig(root, profile), profileConfig, configPath, appPaths, profile };
+    return finalizeProfileRuntime({
+      cfg: runtimeProfileConfig(root, profile), profileConfig, configPath, appPaths, profile,
+    });
   }
 
   if (!opts.allowBootstrap) {
@@ -223,7 +228,9 @@ export async function resolveProfileRuntime(
   await saveRootConfig(root, configPath);
   await writeActiveProfile(appPaths.rootDir, profile);
   console.log(`配置已保存到 ${configPath}\n`);
-  return { cfg: runtimeProfileConfig(root, profile), profileConfig, configPath, appPaths, profile };
+  return finalizeProfileRuntime({
+    cfg: runtimeProfileConfig(root, profile), profileConfig, configPath, appPaths, profile,
+  });
 }
 
 async function bootstrapProfileIntoExistingRoot(args: {
@@ -263,13 +270,32 @@ async function bootstrapProfileIntoExistingRoot(args: {
   };
   await saveRootConfig(markPermissionDefaultsMigration(nextRoot, profile), configPath);
   console.log(`配置已保存到 ${configPath}\n`);
-  return {
+  return finalizeProfileRuntime({
     cfg: runtimeProfileConfig(nextRoot, profile),
     profileConfig,
     configPath,
     appPaths,
     profile,
+  });
+}
+
+async function finalizeProfileRuntime(runtime: ProfileRuntime): Promise<ProfileRuntime> {
+  const root = organizationRoot(
+    runtime.appPaths.rootDir,
+    runtime.profileConfig.organizationId,
+  );
+  const manifest = JSON.parse(await readFile(join(root, 'organization.json'), 'utf8')) as {
+    primaryNodeId?: string;
   };
+  await ensureLocalPrimaryNode({
+    organizationRoot: root,
+    primaryNodeId: manifest.primaryNodeId ?? 'local_primary',
+    host: hostname(),
+    bridgeProfile: runtime.profile,
+    workspace: runtime.profileConfig.workspaces.default ?? runtime.appPaths.defaultWorkspaceDir,
+    capabilities: [runtime.profileConfig.agentKind],
+  });
+  return runtime;
 }
 
 function upgradeLegacyRuntimeDefaults(

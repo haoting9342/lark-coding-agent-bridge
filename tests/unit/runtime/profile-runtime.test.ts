@@ -129,6 +129,18 @@ describe('profile runtime resolver', () => {
     );
     expect(runtime.profile).toBe('claude');
     expect(runtime.profileConfig.workspaces.default).toBe(workspaceRealpath);
+    const nodeRegistry = JSON.parse(await readFile(
+      join(root, 'organizations', 'default', 'nodes', 'node-registry.json'),
+      'utf8',
+    )) as { primaryNodeId: string; nodes: Array<Record<string, unknown>> };
+    expect(nodeRegistry.primaryNodeId).toBe('local_primary');
+    expect(nodeRegistry.nodes).toContainEqual(expect.objectContaining({
+      id: 'local_primary',
+      role: 'primary',
+      authority: 'governance',
+      bridgeProfile: 'claude',
+      workspace: workspaceRealpath,
+    }));
     expect(saved.activeProfile).toBe('claude');
     expect(saved.profiles.claude?.accounts.app.id).toBe('cli_existing');
     expect(saved.profiles.claude?.accounts.app.secret).toEqual({
@@ -443,9 +455,9 @@ describe('profile runtime resolver', () => {
     const bin = join(root, 'bin');
     const codex = await writeExecutable(bin, 'codex');
     const oldPath = process.env.PATH;
-    const oldHome = process.env.LARK_CHANNEL_HOME;
+    const oldHome = process.env.LARK_CHANNEL_DEPARTMENT_HOME;
     process.env.PATH = `${bin}${delimiter}${oldPath ?? ''}`;
-    process.env.LARK_CHANNEL_HOME = root;
+    process.env.LARK_CHANNEL_DEPARTMENT_HOME = root;
     await writeFile(
       join(root, 'config.json'),
       `${JSON.stringify({
@@ -472,9 +484,9 @@ describe('profile runtime resolver', () => {
     } finally {
       process.env.PATH = oldPath;
       if (oldHome === undefined) {
-        delete process.env.LARK_CHANNEL_HOME;
+        delete process.env.LARK_CHANNEL_DEPARTMENT_HOME;
       } else {
-        process.env.LARK_CHANNEL_HOME = oldHome;
+        process.env.LARK_CHANNEL_DEPARTMENT_HOME = oldHome;
       }
     }
   });

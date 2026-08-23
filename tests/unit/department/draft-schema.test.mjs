@@ -47,6 +47,8 @@ describe('department draft schema', () => {
     expect(result.value.businessLifecycle).toEqual(['需求洞察', '内容运营']);
     expect(result.value.taskProtocols[0].steps).toContain('去除 AI 味');
     expect(result.value.organizationTopology.nodes).toHaveLength(1);
+    expect(result.value.organizationTopology.primaryNodeId).toBe('local_primary');
+    expect(result.value.organizationTopology.nodes[0].id).toBe('local_primary');
     expect(result.value.organizationTopology.nodes[0].role).toBe('primary');
   });
 

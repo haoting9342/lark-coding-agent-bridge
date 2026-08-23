@@ -202,7 +202,7 @@ describe('node-native department provisioner', () => {
     const input = request(environment);
     input.draft.capabilityPlan = [{
       id: 'outline-style', kind: 'skill', required: true, scope: 'workspace',
-      installPolicy: 'auto', nodeId: 'primary', bindingMode: 'install', identityBound: false,
+      installPolicy: 'auto', nodeId: 'local_primary', bindingMode: 'install', identityBound: false,
       source: {
         type: 'local_skill', path: source,
         sha256: createHash('sha256').update(manifest).digest('hex'),

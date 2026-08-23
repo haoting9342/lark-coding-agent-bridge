@@ -26,6 +26,15 @@ import {
 import { runStart } from './commands/start';
 import { runUi } from './commands/ui';
 import { runOrganizationDoctor, runOrganizationStatus } from './commands/organization';
+import {
+  runOrganizationHandoffOperation,
+  runOrganizationHandoffStatus,
+  runOrganizationHandoffSubmit,
+  runOrganizationNodeList,
+  runOrganizationNodePlan,
+  runOrganizationNodeRegister,
+  runOrganizationNodeActivate,
+} from './commands/organization-node';
 
 const program = new Command();
 
@@ -93,6 +102,76 @@ organization
   .action(async () => {
     const report = await runOrganizationDoctor();
     if (!report.ready) process.exitCode = 1;
+  });
+
+const organizationNode = organization
+  .command('node')
+  .description('Inspect or plan optional multi-host organization nodes');
+
+organizationNode
+  .command('list')
+  .description('List registered organization nodes')
+  .action(async () => {
+    await runOrganizationNodeList();
+  });
+
+organizationNode
+  .command('plan <node-id>')
+  .description('Print a non-mutating auxiliary-node pairing plan')
+  .requiredOption('--host <alias>', 'primary host alias used by the auxiliary node')
+  .option('--capability <id>', 'capability owned by this node', (value, previous: string[]) => [...previous, value], [])
+  .action(async (nodeId: string, opts: { host: string; capability: string[] }) => {
+    await runOrganizationNodePlan(nodeId, {
+      hostAlias: opts.host,
+      capabilities: opts.capability,
+    });
+  });
+
+organizationNode
+  .command('register <plan-file>')
+  .description('Register an auxiliary node after separate SSH identity setup')
+  .requiredOption('--actor-node <id>', 'primary node authorizing the registration')
+  .requiredOption('--fingerprint <sha256>', 'dedicated SSH public-key fingerprint')
+  .action(async (planFile: string, opts: { actorNode: string; fingerprint: string }) => {
+    await runOrganizationNodeRegister(planFile, {
+      actorNodeId: opts.actorNode,
+      fingerprint: opts.fingerprint,
+    });
+  });
+
+organizationNode
+  .command('activate <node-id>')
+  .description('Mark a separately paired auxiliary node online')
+  .requiredOption('--actor-node <id>', 'primary node authorizing activation')
+  .requiredOption('--profile <name>', 'bridge profile on the auxiliary node')
+  .requiredOption('--workspace <path>', 'absolute auxiliary workspace path')
+  .action(async (nodeId: string, opts: { actorNode: string; profile: string; workspace: string }) => {
+    await runOrganizationNodeActivate(nodeId, {
+      actorNodeId: opts.actorNode,
+      bridgeProfile: opts.profile,
+      workspace: opts.workspace,
+    });
+  });
+
+organization
+  .command('handoff-operation <department-id> <node-id> <operation>')
+  .description('Fixed JSON operation endpoint for a forced-command SSH pairing')
+  .action(async (departmentId: string, nodeId: string, operationName: string) => {
+    await runOrganizationHandoffOperation(departmentId, nodeId, operationName);
+  });
+
+organization
+  .command('handoff-submit <department-id>')
+  .description('Route one bounded JSON task from stdin to the capable department node')
+  .action(async (departmentId: string) => {
+    await runOrganizationHandoffSubmit(departmentId);
+  });
+
+organization
+  .command('handoff-status <department-id> <task-id>')
+  .description('Read a handoff receipt for primary-node synthesis')
+  .action(async (departmentId: string, taskId: string) => {
+    await runOrganizationHandoffStatus(departmentId, taskId);
   });
 
 profile

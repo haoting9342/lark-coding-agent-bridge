@@ -265,9 +265,9 @@ function normalizeOrganizationTopology(value) {
 
 function synthesizedTopology(workspace) {
   return {
-    primaryNodeId: "primary",
+    primaryNodeId: "local_primary",
     nodes: [{
-      id: "primary",
+      id: "local_primary",
       host: "current",
       role: "primary",
       workspace,
@@ -279,25 +279,25 @@ function synthesizedTopology(workspace) {
     agentRoles: [{
       id: "default_coordinator",
       type: "coordinator",
-      nodeId: "primary",
+      nodeId: "local_primary",
       scope: ["governance", "synthesis"],
       separationRequiredFor: [],
     }, {
       id: "default_executor",
       type: "executor",
-      nodeId: "primary",
+      nodeId: "local_primary",
       scope: ["task_execution"],
       separationRequiredFor: [],
     }, {
       id: "default_verifier",
       type: "verifier",
-      nodeId: "primary",
+      nodeId: "local_primary",
       scope: ["quality"],
       separationRequiredFor: ["publishing", "identity"],
     }],
     handoffPolicy: {
       adapterId: "local",
-      ledgerNodeId: "primary",
+      ledgerNodeId: "local_primary",
       defaultFailover: "manual",
       maxSilenceSeconds: 300,
       progressVisibility: "concise_group_status",
@@ -716,7 +716,7 @@ function validateOrganizationTopology(topology, capabilityPlan, taskProtocols, e
         primaryCount += 1;
       }
       const synthesizedSingleNode = topology.nodes.length === 1
-        && node.id === "primary"
+        && node.id === "local_primary"
         && node.host === "current"
         && node.bridgeProfile === "default";
       if (!synthesizedSingleNode) {

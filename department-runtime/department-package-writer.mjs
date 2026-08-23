@@ -28,6 +28,18 @@ function renderDepartmentAgents(request, draft) {
     '',
     `修改规则：${protocol.revisionPolicy}`,
   ].join('\n')).join('\n\n');
+  const multiHostRules = draft.organizationTopology?.nodes?.length > 1
+    ? [
+      '## 多主机任务分发',
+      '',
+      `本部门主节点是 ${draft.organizationTopology.primaryNodeId}，由主节点负责正式规则、共享记忆和最终答复。`,
+      '',
+      `需要辅助节点能力时，将受限 JSON 任务通过 \`lark-channel-bridge-department organization handoff-submit ${request.departmentId}\` 的标准输入提交。`,
+      '辅助节点只返回摘要、证据和回执；普通即时对话由主节点使用 handoff-status 读取结果并汇总答复。',
+      '节点离线时向用户提供等待、重试或人工处理选项，不得伪造结果；身份和发布类任务不得自动故障转移。',
+      '',
+    ]
+    : [];
   return [
     `# ${request.departmentName}`,
     '',
@@ -42,6 +54,7 @@ function renderDepartmentAgents(request, draft) {
     '- 交付前执行对应质量检查；涉及审批边界时必须停下并取得明确授权。',
     '- 保留工作区既有规则，冲突时采用更严格的约束并向用户说明。',
     '',
+    ...multiHostRules,
     '## 职责',
     '',
     bulletList(draft.responsibilities),

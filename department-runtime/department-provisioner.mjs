@@ -141,7 +141,7 @@ function validateRequest(request, organizationRoot, profileRoot) {
 
 function findLocalNode(draft, request, workspace) {
   const topology = draft.organizationTopology;
-  const synthesized = topology.primaryNodeId === 'primary'
+  const synthesized = topology.primaryNodeId === 'local_primary'
     && topology.nodes.length === 1
     && topology.nodes[0].host === 'current';
   const node = synthesized
