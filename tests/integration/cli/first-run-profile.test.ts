@@ -36,6 +36,7 @@ describe('first-run profile bootstrap', () => {
 
     const workspaceRealpath = await realpath(workspace);
     expect(profile.agentKind).toBe('codex');
+    expect(profile.organizationId).toBe('default');
     expect(profile.workspaces).toEqual({ default: workspaceRealpath });
     expect(profile.codex).toMatchObject({
       binaryPath: codex,

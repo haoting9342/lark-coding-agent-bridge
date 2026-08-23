@@ -25,6 +25,7 @@ import {
 } from './commands/service';
 import { runStart } from './commands/start';
 import { runUi } from './commands/ui';
+import { runOrganizationDoctor, runOrganizationStatus } from './commands/organization';
 
 const program = new Command();
 
@@ -74,6 +75,25 @@ program
 const profile = program
   .command('profile')
   .description('Manage local bridge profiles');
+
+const organization = program
+  .command('organization')
+  .description('Inspect the bundled department organization control plane');
+
+organization
+  .command('status')
+  .description('Show the default organization status')
+  .action(async () => {
+    await runOrganizationStatus();
+  });
+
+organization
+  .command('doctor')
+  .description('Validate the default organization control plane')
+  .action(async () => {
+    const report = await runOrganizationDoctor();
+    if (!report.ready) process.exitCode = 1;
+  });
 
 profile
   .command('list')

@@ -51,6 +51,7 @@ import {
   recoverLegacyLarkCliSourceOverlay,
 } from '../lark-cli/legacy-source-overlay';
 import { validateAppCredentials } from '../utils/feishu-auth';
+import { ensureDefaultOrganization } from '../organization/initializer';
 
 export interface ResolveProfileRuntimeOptions {
   config?: string;
@@ -126,6 +127,7 @@ export async function resolveProfileRuntime(
   profile ??= 'claude';
   let appPaths = resolveAppPaths({ rootDir, profile });
   const configPath = opts.config ?? appPaths.configFile;
+  await ensureDefaultOrganization({ rootDir: appPaths.rootDir });
 
   const migrationAgent = resolveBootstrapAgent(requestedAgent, profile);
   const needsMigration = await hasLegacyConfig(configPath);

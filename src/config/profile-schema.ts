@@ -144,6 +144,7 @@ export interface LarkCliConfig {
 
 export interface ProfileConfig {
   schemaVersion: 2;
+  organizationId: string;
   agentKind: AgentKind;
   /** Deployment mode switch. Default 'personal'. See {@link ProfileMode}. */
   mode: ProfileMode;
@@ -222,6 +223,7 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
   }
   const raw = input as {
     schemaVersion?: unknown;
+    organizationId?: unknown;
     agentKind?: unknown;
     mode?: unknown;
     accounts?: unknown;
@@ -273,6 +275,10 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
 
   return {
     schemaVersion: 2,
+    organizationId:
+      typeof raw.organizationId === 'string' && /^[a-z][a-z0-9_-]*$/.test(raw.organizationId)
+        ? raw.organizationId
+        : 'default',
     agentKind: raw.agentKind,
     mode: raw.mode === 'team' ? 'team' : 'personal',
     accounts,

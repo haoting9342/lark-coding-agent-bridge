@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "defaultGates": [
+    "destructive_action",
+    "external_publication",
+    "credential_or_identity_change",
+    "production_change"
+  ]
+}

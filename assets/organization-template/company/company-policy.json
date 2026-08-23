@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "memory": {
+    "mode": "curated",
+    "shareRawSessions": false
+  },
+  "taskLifecycle": [
+    "new",
+    "planning",
+    "running",
+    "waiting_approval",
+    "validating",
+    "completed",
+    "failed",
+    "cancelled",
+    "archived"
+  ]
+}
