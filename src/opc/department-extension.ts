@@ -114,6 +114,9 @@ export type OpcDepartmentIntakeResult =
 export async function intakeOpcDepartmentMessage(
   context: any,
 ): Promise<OpcDepartmentIntakeResult> {
+  if (context.msg.chatType !== 'group' && context.msg.chatType !== 'group_chat') {
+    return { action: 'pass' };
+  }
   try {
     const bootstrap = await loadOpcDepartmentBootstrap();
     const adapted = bridgeContext(context);

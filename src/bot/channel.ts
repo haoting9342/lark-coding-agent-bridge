@@ -18,6 +18,7 @@ import type { AgentAdapter, AgentEvent } from '../agent/types';
 import { handleCardAction } from '../card/dispatcher';
 import { CallbackAuth } from '../card/callback-auth';
 import { CallbackNonceStore } from '../card/callback-store';
+import { forgetManagedCard, sendManagedCard, updateManagedCard } from '../card/managed';
 import { renderCard } from '../card/run-renderer';
 import {
   finalizeIfRunning,
@@ -1061,9 +1062,15 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   }
 
   const replyMode = getMessageReplyMode(controls.cfg);
-  log.info('flush', 'reply-mode', { mode: replyMode });
+  const effectiveReplyMode =
+    controls.profileConfig.agentKind === 'codex' &&
+    replyMode === 'markdown' &&
+    controls.cfg.preferences?.messageReply === undefined
+      ? 'managed-card'
+      : replyMode;
+  log.info('flush', 'reply-mode', { mode: replyMode, effectiveMode: effectiveReplyMode });
   const cotMessages = getCotMessages(controls.cfg);
-  const cotEnabled = cotMessages !== 'off';
+  const cotEnabled = effectiveReplyMode !== 'managed-card' && cotMessages !== 'off';
 
   // Re-read prefs on every flush so toggling /config mid-stream takes
   // effect immediately. Cheap object lookups, no allocation when on.
@@ -1091,7 +1098,9 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   // Add a "Typing" reaction to the triggering message as an instant ack, but
   // never let that outbound API call block agent event draining.
   const reactionPromise =
-    cotEnabled || replyMode === 'card' ? undefined : addWorkingReaction(channel, lastMsg.messageId);
+    cotEnabled || effectiveReplyMode === 'card' || effectiveReplyMode === 'managed-card'
+      ? undefined
+      : addWorkingReaction(channel, lastMsg.messageId);
 
   try {
     if (cotEnabled) {
@@ -1144,7 +1153,77 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       log.warn('cot', 'fallback-existing-reply', { reason: 'create-disabled' });
     }
 
-    if (replyMode === 'card') {
+    if (effectiveReplyMode === 'managed-card') {
+      const { messageId: processMessageId } = await sendManagedCard(
+        channel,
+        chatId,
+        renderCard(initialState, cardRenderOptions),
+        sendOpts,
+      );
+      let lastProcessCardUpdateSucceeded = true;
+      let finalState: RunState;
+      try {
+        finalState = await processAgentStream(
+          handle,
+          eventStream,
+          scope,
+          idleTimeoutMs,
+          recordSession,
+          async (state) => {
+            try {
+              await updateManagedCard(
+                channel,
+                processMessageId,
+                renderCard(filterForPrefs(state), cardRenderOptions),
+              );
+              lastProcessCardUpdateSucceeded = true;
+            } catch (err) {
+              lastProcessCardUpdateSucceeded = false;
+              log.warn('card', 'process-card-update-degraded', {
+                scope,
+                messageId: processMessageId,
+                err: err instanceof Error ? err.message : String(err),
+              });
+            }
+          },
+        );
+
+        const visibleFinalState = filterForPrefs(finalState);
+        if (visibleFinalState.terminal === 'done') {
+          try {
+            await channel.recallMessage(processMessageId);
+            log.info('card', 'process-card-recalled', { scope, messageId: processMessageId });
+          } catch (err) {
+            log.warn('card', 'process-card-recall-failed', {
+              scope,
+              messageId: processMessageId,
+              err: err instanceof Error ? err.message : String(err),
+            });
+          }
+          await sendFinalReply({
+            channel,
+            chatId,
+            scope,
+            state: finalAnswerOnlyState(visibleFinalState),
+            replyMode,
+            sendOpts,
+            cardRenderOptions,
+          });
+        } else if (!lastProcessCardUpdateSucceeded) {
+          await sendFinalReply({
+            channel,
+            chatId,
+            scope,
+            state: finalAnswerOnlyState(visibleFinalState),
+            replyMode,
+            sendOpts,
+            cardRenderOptions,
+          });
+        }
+      } finally {
+        forgetManagedCard(processMessageId);
+      }
+    } else if (replyMode === 'card') {
       let latestState: RunState = initialState;
       let producerStarted = false;
       let cardCtrl:
