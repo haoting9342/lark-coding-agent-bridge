@@ -44,13 +44,6 @@ function summary(state) {
   ].join("\n");
 }
 
-function isExplicitRepeatConfirmation(text) {
-  return classifyDepartmentConfirmation({
-    phase: "awaiting_final_confirmation",
-    text,
-  }).action === "confirm";
-}
-
 function capabilityReply(result) {
   const counts = result.capabilitySummary ?? {};
   const summary = [
@@ -216,13 +209,7 @@ export class DepartmentCommandRuntime {
     if (!state) return { action: "pass" };
     const isAdmin = this.isDepartmentAdmin(context);
 
-    if (state.status === "completed") {
-      if (isAdmin && isExplicitRepeatConfirmation(text)) {
-        safeReply(context, "这个部门已经创建完成，不会重复写入。可用 /department status 查看事务状态。");
-        return { action: "handled" };
-      }
-      return { action: "pass" };
-    }
+    if (state.status === "completed") return { action: "pass" };
     if (state.status === "provisioning") {
       safeReply(context, "部门配置正在事务写入中，请稍后使用 /department status 查询结果。");
       return { action: "handled" };

@@ -73,6 +73,31 @@ describe('exclusive conversational department design', () => {
     expect(designStore.getFor(context).status).toBe('active');
   });
 
+  it('passes agreement replies through after department creation is completed', () => {
+    const { runtime, designStore, context, replies } = setup();
+    const started = designStore.start(context);
+    designStore.update(started.key, {
+      phase: 'awaiting_final_confirmation',
+    }, {
+      actorId: context.senderId,
+      source: 'controller',
+      changedPaths: ['/phase'],
+    });
+    designStore.beginProvisioning(started.key, {
+      actorId: context.senderId,
+      confirmationText: '同意',
+    });
+    designStore.completeProvisioning(started.key, {
+      transactionId: 'txn_completed_department',
+    });
+
+    for (const text of ['同意', '确认', '同意创建', '确认创建', '按这个方案创建']) {
+      context.text = text;
+      expect(runtime.intakeDepartmentMessage(context)).toEqual({ action: 'pass' });
+    }
+    expect(replies).toEqual([]);
+  });
+
   it('loads only the bundled department runtime', async () => {
     const source = await import('node:fs/promises').then(({ readFile }) =>
       readFile(path.join(process.cwd(), 'src', 'department', 'department-extension.ts'), 'utf8'));
