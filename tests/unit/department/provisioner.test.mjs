@@ -140,12 +140,33 @@ describe('node-native department provisioner', () => {
     }
     expect(json(path.join(departmentRoot, 'workflow.json'))).toMatchObject({
       semantics: 'task_execution',
-      taskProtocols: [{ id: 'create_outline' }],
+      orchestrationPolicy: {
+        mode: 'adaptive',
+        roleSemantics: 'responsibility_not_process',
+        defaultForkTurns: 'none',
+        allowFullHistoryFork: false,
+      },
+      taskProtocols: [{
+        id: 'create_outline',
+        qualityChecks: [
+          { id: 'check_1', method: 'coordinator' },
+          { id: 'check_2', method: 'coordinator' },
+        ],
+      }],
       businessLifecycle: ['需求洞察', '内容运营'],
     });
-    expect(readFileSync(path.join(environment.workspace, 'AGENTS.md'), 'utf8')).toMatch(
+    const packageAgents = readFileSync(path.join(departmentRoot, 'AGENTS.md'), 'utf8');
+    const workspaceAgents = readFileSync(path.join(environment.workspace, 'AGENTS.md'), 'utf8');
+    expect(workspaceAgents).toMatch(
       /# Existing rules[\s\S]*lark-channel-bridge-department:start content_design/,
     );
+    for (const agents of [packageAgents, workspaceAgents]) {
+      expect(agents).toContain('角色是职责定义，不等于常驻或必启 Agent 进程');
+      expect(agents).toContain('fork_turns="none"');
+      expect(agents).toContain('最多同时运行 2 个子代理');
+      expect(agents).toContain('路径与摘要');
+      expect(agents).toContain('不得因为存在书面计划');
+    }
     expect(json(path.join(environment.organizationRoot, 'company', 'department-registry.json')).departments)
       .toContainEqual(expect.objectContaining({ id: 'content_design', kind: 'permanent' }));
     expect(json(path.join(environment.organizationRoot, 'router', 'group-router.json')).routes)

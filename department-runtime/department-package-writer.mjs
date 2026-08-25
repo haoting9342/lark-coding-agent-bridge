@@ -6,6 +6,27 @@ function bulletList(values) {
   return (values ?? []).map((value) => `- ${value}`).join('\n') || '- 无';
 }
 
+function qualityCheckText(check) {
+  if (typeof check === 'string') return check;
+  if (!check || typeof check !== 'object') return String(check ?? '');
+  return `[${check.method}/${check.trigger}] ${check.description}`;
+}
+
+function orchestrationRules(policy) {
+  return [
+    '## 自适应代理编排',
+    '',
+    '- 角色是职责定义，不等于常驻或必启 Agent 进程；流程步骤和质量门禁也不得机械映射为子代理。',
+    '- 主代理负责连续工作、状态、依赖、证据和最终整合。仅在工作可独立并行、需要专门能力、独立高风险复核有明显价值，或规模足以抵消派工成本时才委派。',
+    `- 最多同时运行 ${policy.maxConcurrentSubagents} 个子代理；一个工作项最多 ${policy.maxExecutionAgentsPerWorkItem} 个执行代理；一个里程碑最多 ${policy.maxIndependentReviewsPerMilestone} 次独立复核和 ${policy.maxReviewRounds} 轮复审。`,
+    `- 子代理默认使用 \`fork_turns="${policy.defaultForkTurns}"\`；完整历史 fork ${policy.allowFullHistoryFork ? '只有在用户明确批准并记录理由后才允许' : '禁止使用'}。任务包只包含目标、所有权、输入路径、完成条件、证据要求和限制。`,
+    `- 大型图片、PPT、PDF、日志和扫描结果使用${policy.largeArtifactTransfer === 'path_and_summary' ? '工作区路径与摘要' : '小体积内联，大型内容仍使用路径与摘要'}传递，不复制聊天全文或原始大结果。`,
+    '- 确定性质量检查优先交给脚本或工具；coordinator 检查由主代理完成；只有 independent 检查才可使用独立复核代理；human 检查必须等待用户。',
+    `- 模型按工作量分级：检索/定位使用 ${policy.modelRouting.lookup}，常规执行使用 ${policy.modelRouting.execution}，复杂决策使用 ${policy.modelRouting.complexDecision}，独立终审使用 ${policy.modelRouting.independentReview}。`,
+    '- 部门 taskProtocol 决定业务执行方式。通用 Skill 可以提供方法，但不得因为存在书面计划，就用软件开发的 worker/规格审查/代码质量审查模板覆盖 PPT、大纲、报告、研究或内容生产任务。',
+  ];
+}
+
 function renderDepartmentAgents(request, draft) {
   const protocols = (draft.taskProtocols ?? []).map((protocol) => [
     `## ${protocol.name}（${protocol.id}）`,
@@ -20,7 +41,7 @@ function renderDepartmentAgents(request, draft) {
     '',
     `步骤：${(protocol.steps ?? []).join(' → ')}`,
     '',
-    `质量检查：${(protocol.qualityChecks ?? []).join('；')}`,
+    `质量检查：${(protocol.qualityChecks ?? []).map(qualityCheckText).join('；')}`,
     '',
     `交付物：${(protocol.deliverables ?? []).join('、')}`,
     '',
@@ -53,6 +74,8 @@ function renderDepartmentAgents(request, draft) {
     '- 缺少影响交付质量的关键信息时先澄清；能够安全推断的非关键细节可以提出候选方案。',
     '- 交付前执行对应质量检查；涉及审批边界时必须停下并取得明确授权。',
     '- 保留工作区既有规则，冲突时采用更严格的约束并向用户说明。',
+    '',
+    ...orchestrationRules(draft.orchestrationPolicy),
     '',
     ...multiHostRules,
     '## 职责',
@@ -137,6 +160,7 @@ export function buildDepartmentPackage(request, draft, confirmedAt) {
     schemaVersion: 1,
     semantics: 'task_execution',
     defaultFlow: draft.workflow,
+    orchestrationPolicy: draft.orchestrationPolicy,
     businessLifecycle: draft.businessLifecycle,
     taskProtocols: draft.taskProtocols,
     recurringWorkflows: draft.recurringWorkflows ?? [],

@@ -48,3 +48,11 @@ Capability results are truthful rather than optimistic: built-in, local and fixe
 ## What a task protocol means
 
 A task protocol describes how the agent handles a specific user request. For example, “make a presentation” can require narrative structure, visual consistency, source checks, rendering and final quality review. It is not the same as the department's business lifecycle, such as all stages needed to prepare a public course. The confirmed package keeps these layers separate.
+
+## Adaptive Agent orchestration
+
+Department roles are responsibility definitions, not a request to keep one Agent process running for every role. Workflow steps and quality gates also do not automatically create subagents. A generated department uses an `adaptive` orchestration policy by default: the coordinator handles continuous and tightly coupled work, while subagents are reserved for independent parallel work, specialized capabilities, valuable high-risk review, or work large enough to justify handoff overhead.
+
+The default package permits at most two concurrent subagents, one execution Agent per bounded work item, one independent review per milestone, and one review round unless a new localized defect is found. Subagents receive a compact task packet and default to `fork_turns="none"`; large images, presentations, PDFs and logs are passed by workspace path plus summary.
+
+Quality checks are typed. `deterministic` checks use scripts or tools, `coordinator` checks stay with the primary Agent, `independent` checks may use a separate reviewer within the review budget, and `human` checks stop for explicit user approval. Generic software-development Skills must not replace a PPT, outline, report, research or content protocol merely because the task has a written plan.

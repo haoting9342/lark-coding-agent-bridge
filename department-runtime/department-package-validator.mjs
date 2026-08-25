@@ -57,6 +57,12 @@ export function validateDepartmentPackage(directory, expected) {
   if (!Array.isArray(workflow.taskProtocols) || workflow.taskProtocols.length === 0) {
     throw new Error('department package requires at least one task protocol');
   }
+  if (
+    !new Set(['adaptive', 'coordinator_only', 'delegated']).has(workflow.orchestrationPolicy?.mode)
+    || workflow.orchestrationPolicy?.roleSemantics !== 'responsibility_not_process'
+  ) {
+    throw new Error('department package orchestration policy is invalid');
+  }
   if (topology.schemaVersion !== 1 || !topology.primaryNodeId || !Array.isArray(topology.nodes)) {
     throw new Error('department topology is invalid');
   }

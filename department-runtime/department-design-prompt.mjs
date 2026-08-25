@@ -77,11 +77,15 @@ export function buildDepartmentDesignPrompt({
 
 不得把业务生命周期写入通用任务周期，也不得让单项任务依次执行整个部门或项目流程。收到具体请求时，只执行与用户意图匹配的一个或多个任务规程；如果需要组合多个规程，要说明依赖关系。每个核心任务规程都要有可验证的质量门禁和可直接使用的交付物合同，不能只写“执行、检查、交付”之类空泛步骤。
 
+必须设计 orchestrationPolicy，但默认采用 adaptive，不得强制单代理，也不得把专业角色机械变成 Agent 进程。角色不等于 Agent 实例，流程节点不等于子代理，质量门禁也不等于独立审查代理。只有任务可独立并行、需要专门能力、独立高风险复核能明显降低风险，或规模足以抵消派工成本时才建议委派。默认最多并行 2 个子代理、每个工作项 1 个执行代理、每个里程碑 1 次独立复核和 1 轮复审；子代理默认使用 fork_turns="none" 和精简任务包，大型图片、PPT、PDF、日志与扫描结果通过工作区路径和摘要传递。
+
+质量检查必须标注 method 和 trigger。deterministic 用脚本或确定性工具；coordinator 由主代理检查；independent 才允许创建独立复核 Agent；human 必须等待用户确认。不得仅因存在书面计划，就让软件开发型 Skill 的 worker、规格审查、代码质量审查流程覆盖部门规程。subagent-driven-development 等开发执行流程只适用于真实代码实现，不适用于 PPT、大纲、报告、研究或内容生产。
+
 创建顺序如下：先结合历史上下文和用户给出的代表性任务提取核心服务，再为每个核心服务提出完整任务规程；把长期业务阶段或项目阶段单独写入业务生命周期；盘点已有 Skills、脚本和工具并建立 task protocol 到 Skills 的映射。对用户明确接受的工具链必须建立结构化 capabilityPlan：已有能力验证并绑定；来源、固定版本、安装范围和验证方式明确的低风险能力，在最终确认后自动安装和物化；需要 OAuth、密钥、个人身份、系统权限或不受支持适配器的能力必须标为 approval_required 或 manual，保持待授权，不得静默跳过或宣称已可用。
 
 taskProtocols[*].skills 只用于任务路由和可读说明，不能作为可执行安装指令。不得把“之后安装”“外部候选”之类说明文字塞进 Skill 名称并假装已经形成安装计划。外部能力若缺少可信来源、固定 ref/版本、scope、installPolicy 或 verification，只能记录为能力缺口，不能设置 auto。只有用户已经对该能力的准确来源和用途作出局部确认，才可使用 installPolicy=auto；最终部门确认同时授权这些已经逐项确认的低风险物化项。
 
-多主机、多 Agent 场景必须额外设计 organizationTopology，但先用自然语言向用户展示组织摘要并确认，不能要求用户理解或手写 YAML。一个部门恰好有一个主节点；主节点负责治理、最终答复和共享记忆，辅助节点只执行能力边界内的任务。每个任务规程通过 executionPolicy 指定 coordinatorNodeId、preferredNodeId、requiredCapabilities、verifierRoleId、deliveryMode、failoverPolicy、最大静默时间和最小 contextScopes。固定角色类型是 coordinator、executor、verifier，允许增加领域角色；具体 Agent 实例按任务临时创建。
+多主机、多 Agent 场景必须额外设计 organizationTopology，但先用自然语言向用户展示组织摘要并确认，不能要求用户理解或手写 YAML。一个部门恰好有一个主节点；主节点负责治理、最终答复和共享记忆，辅助节点只执行能力边界内的任务。每个任务规程通过 executionPolicy 指定 coordinatorNodeId、preferredNodeId、requiredCapabilities、verifierRoleId、deliveryMode、failoverPolicy、最大静默时间和最小 contextScopes。固定角色类型是 coordinator、executor、verifier，允许增加领域角色；这些是责任角色，不代表必须创建对应 Agent 实例，具体实例只能按 orchestrationPolicy 的触发条件临时创建。
 
 能力必须通过 capabilityPlan[*].nodeId 归属到节点。已有本地能力使用 bindingMode=bind_existing 验证并绑定，不复制、不重装；登录态或设备身份能力设置 identityBound=true，凭证和浏览器资料不得离开所属节点。身份、发布、消息和设备操作不得自动故障转移。只有明确低风险且幂等的任务才可使用自动故障转移。direct_with_receipt 只允许用于用户已经确认的周期任务；普通即时对话一律由辅助节点返回证据，再由主节点通过 primary_synthesized 汇总答复。
 
@@ -97,7 +101,12 @@ taskProtocols: [{
   "requiredInputs": ["必要输入"],
   "clarificationPolicy": "缺少或含糊信息时如何处理",
   "steps": ["专业执行步骤"],
-  "qualityChecks": ["可验证的质量检查"],
+  "qualityChecks": [{
+    "id": "稳定的 snake_case 检查 ID",
+    "description": "可验证的质量检查",
+    "method": "deterministic|coordinator|independent|human",
+    "trigger": "always|on_failure|risk_based|before_external_action"
+  }],
   "deliverables": ["可直接使用的交付物"],
   "completionCriteria": ["完成条件"],
   "skills": ["已盘点并适用的 Skill 名称"],
@@ -118,6 +127,24 @@ taskProtocols: [{
     "idempotent": false
   }
 }]
+orchestrationPolicy: {
+  "mode": "adaptive",
+  "roleSemantics": "responsibility_not_process",
+  "delegationTriggers": ["independent_parallel_work", "specialized_capability", "independent_high_risk_review", "scale_justifies_handoff"],
+  "maxConcurrentSubagents": 2,
+  "maxExecutionAgentsPerWorkItem": 1,
+  "maxIndependentReviewsPerMilestone": 1,
+  "maxReviewRounds": 1,
+  "defaultForkTurns": "none",
+  "recentTurnLimit": 3,
+  "allowFullHistoryFork": false,
+  "deterministicChecksFirst": true,
+  "largeArtifactTransfer": "path_and_summary",
+  "modelRouting": {
+    "lookup": "lightweight", "execution": "standard",
+    "complexDecision": "critical", "independentReview": "critical"
+  }
+}
 capabilityPlan: [{
   "id": "稳定能力 ID，例如 presentation-skill",
   "kind": "builtin|skill|mcp|plugin|tool",

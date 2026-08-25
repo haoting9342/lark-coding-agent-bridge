@@ -14,6 +14,16 @@ function safeJson(file, label) {
   }
 }
 
+function evidenceRequirements(checks) {
+  return (Array.isArray(checks) ? checks : []).flatMap((check) => {
+    if (typeof check === 'string' && check.trim()) return [check.trim()];
+    if (check && typeof check === 'object' && typeof check.description === 'string' && check.description.trim()) {
+      return [check.description.trim()];
+    }
+    return [];
+  });
+}
+
 export class DepartmentHandoffService {
   constructor({ organizationRoot, departmentId } = {}) {
     if (typeof organizationRoot !== 'string' || !path.isAbsolute(organizationRoot)) {
@@ -57,7 +67,7 @@ export class DepartmentHandoffService {
       requiredCapabilities: executionPolicy.requiredCapabilities ?? [],
       context: input.context ?? {},
       deliverables: protocol.deliverables ?? [],
-      evidenceRequirements: protocol.qualityChecks ?? [],
+      evidenceRequirements: evidenceRequirements(protocol.qualityChecks),
       deadline: input.deadline ?? null,
       progressPolicy: {
         maxSilenceSeconds: executionPolicy.maxSilenceSeconds ?? 300,

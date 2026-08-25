@@ -37,6 +37,14 @@ describe('bridge system prompt bot collaboration rules', () => {
     expect(BRIDGE_SYSTEM_PROMPT).toContain('[名字 (user|bot)]');
     expect(BRIDGE_SYSTEM_PROMPT).toContain('不要模仿');
   });
+
+  it('keeps department roles, quality gates, and generic skills from forcing redundant agents', () => {
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('角色和流程节点不等于 Agent 进程');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('fork_turns="none"');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('路径与摘要');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('PPT、大纲、报告、研究或内容生产');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('不得仅因为存在书面计划');
+  });
 });
 
 describe('buildBridgeSystemPrompt', () => {

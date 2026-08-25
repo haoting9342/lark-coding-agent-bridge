@@ -15,7 +15,12 @@ function fixture(status = 'online') {
     taskProtocols: [{
       id: 'authenticated_research',
       deliverables: ['结构化摘要'],
-      qualityChecks: ['含 URL 和时间'],
+      qualityChecks: [{
+        id: 'source_traceability',
+        description: '含 URL 和时间',
+        method: 'deterministic',
+        trigger: 'always',
+      }],
       executionPolicy: {
         preferredNodeId: 'mac_aux',
         requiredCapabilities: ['authenticated_browser'],
@@ -71,6 +76,7 @@ describe('automatic handoff service', () => {
     expect(duplicate).toMatchObject({ status: 'queued', assignedNodeId: 'mac_aux', duplicate: true });
     expect(service.status(first.task.id)).toMatchObject({
       state: 'queued', deliveryMode: 'primary_synthesized',
+      evidenceRequirements: ['含 URL 和时间'],
     });
   });
 

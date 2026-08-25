@@ -11,6 +11,7 @@ const COMMON_FIELDS = new Set([
   "workflow",
   "businessLifecycle",
   "taskProtocols",
+  "orchestrationPolicy",
   "capabilityPlan",
   "organizationTopology",
   "approvalBoundaries",
@@ -80,6 +81,33 @@ const TASK_PROTOCOL_FIELDS = new Set([
   "revisionPolicy",
   "executionPolicy",
 ]);
+const QUALITY_CHECK_FIELDS = new Set(["id", "description", "method", "trigger"]);
+const QUALITY_CHECK_METHODS = new Set(["deterministic", "coordinator", "independent", "human"]);
+const QUALITY_CHECK_TRIGGERS = new Set(["always", "on_failure", "risk_based", "before_external_action"]);
+const ORCHESTRATION_POLICY_FIELDS = new Set([
+  "mode",
+  "roleSemantics",
+  "delegationTriggers",
+  "maxConcurrentSubagents",
+  "maxExecutionAgentsPerWorkItem",
+  "maxIndependentReviewsPerMilestone",
+  "maxReviewRounds",
+  "defaultForkTurns",
+  "recentTurnLimit",
+  "allowFullHistoryFork",
+  "deterministicChecksFirst",
+  "largeArtifactTransfer",
+  "modelRouting",
+]);
+const MODEL_ROUTING_FIELDS = new Set(["lookup", "execution", "complexDecision", "independentReview"]);
+const ORCHESTRATION_MODES = new Set(["adaptive", "coordinator_only", "delegated"]);
+const DELEGATION_TRIGGERS = new Set([
+  "independent_parallel_work",
+  "specialized_capability",
+  "independent_high_risk_review",
+  "scale_justifies_handoff",
+]);
+const MODEL_CLASSES = new Set(["lightweight", "standard", "critical"]);
 const CAPABILITY_FIELDS = new Set([
   "id",
   "kind",
@@ -163,6 +191,26 @@ function normalizeStringArray(value) {
   return [...new Set(items)];
 }
 
+function normalizeQualityChecks(value) {
+  if (!Array.isArray(value)) return value;
+  return value.map((check, index) => {
+    if (typeof check === "string") {
+      return {
+        id: `check_${index + 1}`,
+        description: normalizeText(check),
+        method: "coordinator",
+        trigger: "always",
+      };
+    }
+    if (!check || typeof check !== "object" || Array.isArray(check)) return check;
+    const normalized = structuredClone(check);
+    for (const field of ["id", "description", "method", "trigger"]) {
+      if (field in normalized) normalized[field] = normalizeText(normalized[field]);
+    }
+    return normalized;
+  });
+}
+
 function normalizeTaskProtocols(value) {
   if (!Array.isArray(value)) return value;
   return value.map((protocol) => {
@@ -175,12 +223,14 @@ function normalizeTaskProtocols(value) {
       "intents",
       "requiredInputs",
       "steps",
-      "qualityChecks",
       "deliverables",
       "completionCriteria",
       "skills",
     ]) {
       if (field in normalized) normalized[field] = normalizeStringArray(normalized[field]);
+    }
+    if ("qualityChecks" in normalized) {
+      normalized.qualityChecks = normalizeQualityChecks(normalized.qualityChecks);
     }
     if (normalized.executionPolicy && typeof normalized.executionPolicy === "object") {
       const policy = normalized.executionPolicy;
@@ -196,6 +246,62 @@ function normalizeTaskProtocols(value) {
     }
     return normalized;
   });
+}
+
+function defaultOrchestrationPolicy() {
+  return {
+    mode: "adaptive",
+    roleSemantics: "responsibility_not_process",
+    delegationTriggers: [
+      "independent_parallel_work",
+      "specialized_capability",
+      "independent_high_risk_review",
+      "scale_justifies_handoff",
+    ],
+    maxConcurrentSubagents: 2,
+    maxExecutionAgentsPerWorkItem: 1,
+    maxIndependentReviewsPerMilestone: 1,
+    maxReviewRounds: 1,
+    defaultForkTurns: "none",
+    recentTurnLimit: 3,
+    allowFullHistoryFork: false,
+    deterministicChecksFirst: true,
+    largeArtifactTransfer: "path_and_summary",
+    modelRouting: {
+      lookup: "lightweight",
+      execution: "standard",
+      complexDecision: "critical",
+      independentReview: "critical",
+    },
+  };
+}
+
+function normalizeOrchestrationPolicy(value) {
+  const defaults = defaultOrchestrationPolicy();
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const suppliedModelRouting = Object.prototype.hasOwnProperty.call(value, "modelRouting");
+  const validModelRouting = value.modelRouting
+    && typeof value.modelRouting === "object"
+    && !Array.isArray(value.modelRouting);
+  const normalized = {
+    ...defaults,
+    ...structuredClone(value),
+    modelRouting: suppliedModelRouting
+      ? (validModelRouting
+        ? { ...defaults.modelRouting, ...structuredClone(value.modelRouting) }
+        : structuredClone(value.modelRouting))
+      : defaults.modelRouting,
+  };
+  for (const field of ["mode", "roleSemantics", "defaultForkTurns", "largeArtifactTransfer"]) {
+    if (field in normalized) normalized[field] = normalizeText(normalized[field]);
+  }
+  normalized.delegationTriggers = normalizeStringArray(normalized.delegationTriggers);
+  if (normalized.modelRouting && typeof normalized.modelRouting === "object" && !Array.isArray(normalized.modelRouting)) {
+    for (const field of Object.keys(normalized.modelRouting)) {
+      normalized.modelRouting[field] = normalizeText(normalized.modelRouting[field]);
+    }
+  }
+  return normalized;
 }
 
 function normalizeCapabilityPlan(value) {
@@ -335,6 +441,99 @@ function requireStringArray(value, field, errors, { allowEmpty = false } = {}) {
   }
 }
 
+function validateQualityChecks(value, base, errors) {
+  if (!Array.isArray(value) || value.length === 0) {
+    addError(errors, base, "INVALID_QUALITY_CHECKS", "qualityChecks must be a non-empty array");
+    return;
+  }
+  const ids = new Set();
+  for (const [index, check] of value.entries()) {
+    const pathValue = `${base}/${index}`;
+    if (!check || typeof check !== "object" || Array.isArray(check)) {
+      addError(errors, pathValue, "INVALID_QUALITY_CHECK", "quality check must be an object");
+      continue;
+    }
+    for (const field of Object.keys(check)) {
+      if (!QUALITY_CHECK_FIELDS.has(field)) {
+        addError(errors, `${pathValue}/${field}`, "UNKNOWN_FIELD", `unknown quality check field: ${field}`);
+      }
+    }
+    if (typeof check.id !== "string" || !/^[a-z][a-z0-9_]*$/.test(check.id)) {
+      addError(errors, `${pathValue}/id`, "INVALID_QUALITY_CHECK_ID", "quality check id must be snake_case");
+    } else if (ids.has(check.id)) {
+      addError(errors, `${pathValue}/id`, "DUPLICATE_QUALITY_CHECK_ID", `duplicate quality check id: ${check.id}`);
+    } else {
+      ids.add(check.id);
+    }
+    requireText(check.description, `${pathValue.slice(1)}/description`, errors);
+    if (!QUALITY_CHECK_METHODS.has(check.method)) {
+      addError(errors, `${pathValue}/method`, "INVALID_QUALITY_CHECK_METHOD", "invalid quality check method");
+    }
+    if (!QUALITY_CHECK_TRIGGERS.has(check.trigger)) {
+      addError(errors, `${pathValue}/trigger`, "INVALID_QUALITY_CHECK_TRIGGER", "invalid quality check trigger");
+    }
+  }
+}
+
+function validateOrchestrationPolicy(policy, errors) {
+  const base = "/orchestrationPolicy";
+  if (!policy || typeof policy !== "object" || Array.isArray(policy)) {
+    addError(errors, base, "INVALID_ORCHESTRATION_POLICY", "orchestrationPolicy must be an object");
+    return;
+  }
+  for (const field of Object.keys(policy)) {
+    if (!ORCHESTRATION_POLICY_FIELDS.has(field)) {
+      addError(errors, `${base}/${field}`, "UNKNOWN_FIELD", `unknown orchestration policy field: ${field}`);
+    }
+  }
+  if (!ORCHESTRATION_MODES.has(policy.mode)) {
+    addError(errors, `${base}/mode`, "INVALID_ORCHESTRATION_MODE", "invalid orchestration mode");
+  }
+  if (policy.roleSemantics !== "responsibility_not_process") {
+    addError(errors, `${base}/roleSemantics`, "INVALID_ROLE_SEMANTICS", "roles must describe responsibility, not processes");
+  }
+  requireStringArray(policy.delegationTriggers, "orchestrationPolicy/delegationTriggers", errors, { allowEmpty: true });
+  for (const [index, trigger] of (Array.isArray(policy.delegationTriggers) ? policy.delegationTriggers : []).entries()) {
+    if (!DELEGATION_TRIGGERS.has(trigger)) {
+      addError(errors, `${base}/delegationTriggers/${index}`, "INVALID_DELEGATION_TRIGGER", `invalid delegation trigger: ${String(trigger)}`);
+    }
+  }
+  for (const [field, minimum, maximum] of [
+    ["maxConcurrentSubagents", 0, 8],
+    ["maxExecutionAgentsPerWorkItem", 1, 4],
+    ["maxIndependentReviewsPerMilestone", 0, 3],
+    ["maxReviewRounds", 0, 3],
+    ["recentTurnLimit", 1, 3],
+  ]) {
+    if (!Number.isInteger(policy[field]) || policy[field] < minimum || policy[field] > maximum) {
+      addError(errors, `${base}/${field}`, "INVALID_ORCHESTRATION_LIMIT", `${field} must be between ${minimum} and ${maximum}`);
+    }
+  }
+  if (!new Set(["none", "recent"]).has(policy.defaultForkTurns)) {
+    addError(errors, `${base}/defaultForkTurns`, "INVALID_FORK_POLICY", "defaultForkTurns must be none or recent");
+  }
+  if (typeof policy.allowFullHistoryFork !== "boolean" || typeof policy.deterministicChecksFirst !== "boolean") {
+    addError(errors, base, "INVALID_ORCHESTRATION_BOOLEAN", "orchestration flags must be booleans");
+  }
+  if (!new Set(["path_and_summary", "inline_small"]).has(policy.largeArtifactTransfer)) {
+    addError(errors, `${base}/largeArtifactTransfer`, "INVALID_ARTIFACT_TRANSFER", "invalid large artifact transfer policy");
+  }
+  if (!policy.modelRouting || typeof policy.modelRouting !== "object" || Array.isArray(policy.modelRouting)) {
+    addError(errors, `${base}/modelRouting`, "INVALID_MODEL_ROUTING", "modelRouting must be an object");
+  } else {
+    for (const field of Object.keys(policy.modelRouting)) {
+      if (!MODEL_ROUTING_FIELDS.has(field)) {
+        addError(errors, `${base}/modelRouting/${field}`, "UNKNOWN_FIELD", `unknown model routing field: ${field}`);
+      }
+    }
+    for (const field of MODEL_ROUTING_FIELDS) {
+      if (!MODEL_CLASSES.has(policy.modelRouting[field])) {
+        addError(errors, `${base}/modelRouting/${field}`, "INVALID_MODEL_CLASS", `invalid model class for ${field}`);
+      }
+    }
+  }
+}
+
 function isValidIsoDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [year, month, day] = value.split("-").map(Number);
@@ -470,9 +669,10 @@ function validateTaskProtocols(value, errors, requireReady) {
       errors,
     );
     requireText(protocol.revisionPolicy, `${base.slice(1)}/revisionPolicy`, errors);
-    for (const field of ["intents", "steps", "qualityChecks", "deliverables", "completionCriteria"]) {
+    for (const field of ["intents", "steps", "deliverables", "completionCriteria"]) {
       requireStringArray(protocol[field], `${base.slice(1)}/${field}`, errors);
     }
+    validateQualityChecks(protocol.qualityChecks, `${base}/qualityChecks`, errors);
     for (const field of ["requiredInputs", "skills"]) {
       requireStringArray(protocol[field] ?? [], `${base.slice(1)}/${field}`, errors, {
         allowEmpty: true,
@@ -950,6 +1150,9 @@ function normalizeDraft(input) {
   value.organizationTopology = "organizationTopology" in value
     ? normalizeOrganizationTopology(value.organizationTopology)
     : synthesizedTopology(value.workspace);
+  value.orchestrationPolicy = "orchestrationPolicy" in value
+    ? normalizeOrchestrationPolicy(value.orchestrationPolicy)
+    : defaultOrchestrationPolicy();
   value.capabilityPlan = normalizeCapabilityPlan(value.capabilityPlan ?? []);
   const primaryNodeId = value.organizationTopology?.primaryNodeId;
   if (Array.isArray(value.capabilityPlan) && typeof primaryNodeId === "string") {
@@ -1025,6 +1228,7 @@ export function validateDepartmentDraft(input, { requireReady = false } = {}) {
     allowEmpty: true,
   });
   validateTaskProtocols(value.taskProtocols, errors, requireReady);
+  validateOrchestrationPolicy(value.orchestrationPolicy, errors);
   validateCapabilityPlan(value.capabilityPlan, errors);
   validateOrganizationTopology(
     value.organizationTopology,
