@@ -7,6 +7,7 @@
 Only the Feishu app owner or a configured bridge administrator can start a design, and creation is available only in a group:
 
 ```text
+/cd <absolute workspace path>
 /department create <department name>
 /department status
 /department pause
@@ -14,11 +15,13 @@ Only the Feishu app owner or a configured bridge administrator can start a desig
 /department cancel
 ```
 
+Workspace selection is an operational prerequisite rather than a department business field. The current scope, or its Feishu group when the scope is a topic, must already have an explicit workspace mapping. A profile-level `workspaces.default` is never treated as authorization to inventory that directory. When the group is unmapped, creation returns `/cd` guidance without scanning, creating a draft or reserving the group.
+
 Natural-language equivalents are also accepted for pause and resume. Pausing preserves the draft and returns the group to normal agent work. While a design is active, the group is intentionally reserved for department design; unrelated requests are not executed.
 
 ## Conversation model
 
-The department name is the one field chosen directly by the user. The agent inventories safe historical context from the bound workspace, including `AGENTS.md`, READMEs, worklogs and plans, then proposes the rest for discussion. Secret-like files, bridge state, SSH state, dependency trees and oversized files are excluded.
+The department name is the one business field chosen directly by the user. After workspace binding, the agent inventories safe historical context from that workspace, including `AGENTS.md`, READMEs, worklogs and plans, then proposes the rest for discussion. Inventory recursively stays inside the selected workspace; only a bounded set of inherited parent `AGENTS.md` files is checked, without scanning parent or sibling directories. Secret-like files, bridge state, SSH state, dependency trees and oversized files are excluded.
 
 The proposal must distinguish:
 

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { DepartmentCommandRuntime } from '../../../department-runtime/department-command-runtime.mjs';
 import { DepartmentDesignStore } from '../../../department-runtime/department-design-store.mjs';
 
-function setup() {
+function setup(overrides = {}) {
   const directory = mkdtempSync(path.join(tmpdir(), 'department-intake-'));
   const storeFile = path.join(directory, 'design-sessions.json');
   const designStore = new DepartmentDesignStore(storeFile);
@@ -14,7 +14,7 @@ function setup() {
     designStore,
     isDepartmentAdmin: (context) => context.senderId === 'ou_owner',
     provisioner: { provision: () => { throw new Error('not expected'); } },
-    inventoryContext: () => ({ workspace: directory, sources: [] }),
+    inventoryContext: overrides.inventoryContext ?? (() => ({ workspace: directory, sources: [] })),
     draftCli: path.join(directory, 'department-draft-cli.mjs'),
     storeFile,
   });
@@ -27,7 +27,9 @@ function setup() {
     scope: 'oc_new_group',
     senderId: 'ou_owner',
     groupName: '新部门',
-    currentWorkspace: directory,
+    currentWorkspace: overrides.currentWorkspace === undefined
+      ? directory
+      : overrides.currentWorkspace,
     text: '',
     messageId: 'om_1',
     reply: (text) => replies.push(text),
@@ -73,6 +75,38 @@ describe('exclusive conversational department design', () => {
     expect(designStore.getFor(context).status).toBe('active');
   });
 
+  it('requires an explicit group workspace before starting design', () => {
+    let inventoryCalls = 0;
+    const { runtime, designStore, context, replies } = setup({
+      currentWorkspace: null,
+      inventoryContext: () => {
+        inventoryCalls += 1;
+        throw new Error('must not scan a profile default');
+      },
+    });
+
+    runtime.handleDepartmentCommand('create 测试部', context);
+
+    expect(inventoryCalls).toBe(0);
+    expect(designStore.getFor(context)).toBeNull();
+    expect(replies.at(-1)).toMatch(/workspace|工作区/i);
+    expect(replies.at(-1)).toContain('/cd');
+  });
+
+  it('replies when inventory fails and does not leave a design session', () => {
+    const { runtime, designStore, context, replies } = setup({
+      inventoryContext: () => {
+        throw new Error('inventory exploded');
+      },
+    });
+
+    runtime.handleDepartmentCommand('create 测试部', context);
+
+    expect(designStore.getFor(context)).toBeNull();
+    expect(replies.at(-1)).toMatch(/未启动|读取失败/);
+    expect(replies.at(-1)).toMatch(/重试|\/department create/);
+  });
+
   it('passes agreement replies through after department creation is completed', () => {
     const { runtime, designStore, context, replies } = setup();
     const started = designStore.start(context);
@@ -104,5 +138,7 @@ describe('exclusive conversational department design', () => {
     expect(source).not.toContain('OPC_DEPARTMENT_RUNTIME_ENTRY');
     expect(source).not.toContain('OPC_DEPARTMENT_CONTROLLER_CONFIG');
     expect(source).toContain('department-runtime/bootstrap.mjs');
+    expect(source).toContain('resolveMappedDepartmentWorkspace');
+    expect(source).not.toContain('profileConfig.workspaces.default');
   });
 });

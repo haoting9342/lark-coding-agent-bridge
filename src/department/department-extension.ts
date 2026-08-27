@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { pathToFileURL } from 'node:url';
+import { resolveMappedDepartmentWorkspace } from '../../department-runtime/department-workspace.mjs';
 
 let departmentBootstrapPromise: Promise<any> | undefined;
 
@@ -67,10 +68,11 @@ function bridgeContext(context: any): Record<string, unknown> {
       context.msg.chatId,
     text: context.msg.content,
     messageId: context.msg.messageId,
-    currentWorkspace:
-      context.workspaces.cwdFor(context.scope) ??
-      context.controls.profileConfig.workspaces.default ??
-      null,
+    currentWorkspace: resolveMappedDepartmentWorkspace({
+      scope: context.scope,
+      chatId: context.msg.chatId,
+      workspaces: context.workspaces,
+    }),
     isDepartmentAdmin: canRunAdminCommand(
       context.controls.profileConfig,
       context.controls,

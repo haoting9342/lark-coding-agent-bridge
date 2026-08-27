@@ -10,6 +10,20 @@ import path from "node:path";
 
 const DEFAULT_MAX_FILES = 200;
 const DEFAULT_MAX_FILE_BYTES = 25 * 1024 * 1024;
+const RECOVERABLE_FILESYSTEM_ERRORS = new Set([
+  'EACCES',
+  'ELOOP',
+  'ENOENT',
+  'ENOTDIR',
+  'EPERM',
+]);
+const DEFAULT_FILE_SYSTEM = Object.freeze({
+  lstatSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+});
 const SKIPPED_DIRECTORIES = new Set([
   ".codex",
   ".lark-channel",
@@ -96,31 +110,46 @@ function shouldInclude(relativePath) {
   );
 }
 
-function sourceMetadata(absolutePath, relativePath, maxFileBytes) {
-  const file = lstatSync(absolutePath);
-  if (!file.isFile() || file.isSymbolicLink() || file.size > maxFileBytes) return null;
-  const data = readFileSync(absolutePath);
-  const classification = classify(relativePath);
-  return {
-    relativePath: relativePath.replaceAll(path.sep, "/"),
-    type: classification.type,
-    confidence: classification.confidence,
-    size: file.size,
-    mtimeMs: Math.trunc(file.mtimeMs),
-    sha256: createHash("sha256").update(data).digest("hex"),
-  };
+function isRecoverableFileSystemError(error) {
+  return RECOVERABLE_FILESYSTEM_ERRORS.has(error?.code);
 }
 
-function walkWorkspace(workspace, current, candidates) {
-  const entries = readdirSync(current, { withFileTypes: true })
-    .sort((left, right) => left.name.localeCompare(right.name, "en"));
+function sourceMetadata(absolutePath, relativePath, maxFileBytes, fileSystem) {
+  try {
+    const file = fileSystem.lstatSync(absolutePath);
+    if (!file.isFile() || file.isSymbolicLink() || file.size > maxFileBytes) return null;
+    const data = fileSystem.readFileSync(absolutePath);
+    const classification = classify(relativePath);
+    return {
+      relativePath: relativePath.replaceAll(path.sep, "/"),
+      type: classification.type,
+      confidence: classification.confidence,
+      size: file.size,
+      mtimeMs: Math.trunc(file.mtimeMs),
+      sha256: createHash("sha256").update(data).digest("hex"),
+    };
+  } catch (error) {
+    if (isRecoverableFileSystemError(error)) return null;
+    throw error;
+  }
+}
+
+function walkWorkspace(workspace, current, candidates, fileSystem) {
+  let entries;
+  try {
+    entries = fileSystem.readdirSync(current, { withFileTypes: true });
+  } catch (error) {
+    if (current !== workspace && isRecoverableFileSystemError(error)) return;
+    throw error;
+  }
+  entries.sort((left, right) => left.name.localeCompare(right.name, "en"));
   for (const entry of entries) {
     const absolutePath = path.join(current, entry.name);
     const relativePath = path.relative(workspace, absolutePath);
     if (isSecretPath(relativePath) || entry.isSymbolicLink()) continue;
     if (entry.isDirectory()) {
       if (entry.name === ".git") continue;
-      walkWorkspace(workspace, absolutePath, candidates);
+      walkWorkspace(workspace, absolutePath, candidates, fileSystem);
       continue;
     }
     if (entry.isFile() && shouldInclude(relativePath)) {
@@ -129,20 +158,21 @@ function walkWorkspace(workspace, current, candidates) {
   }
 }
 
-function parentAgentCandidates(workspace, candidates, maxAncestors) {
+function parentAgentCandidates(workspace, candidates, maxAncestors, fileSystem) {
   let current = path.dirname(workspace);
   for (let index = 0; index < maxAncestors && current !== path.dirname(current); index += 1) {
     const candidate = path.join(current, "AGENTS.md");
     try {
-      const file = lstatSync(candidate);
+      const file = fileSystem.lstatSync(candidate);
       if (file.isFile() && !file.isSymbolicLink()) {
         candidates.push({
           absolutePath: candidate,
           relativePath: path.relative(workspace, candidate),
         });
       }
-    } catch {
-      // Missing ancestor rules are normal.
+    } catch (error) {
+      if (!isRecoverableFileSystemError(error)) throw error;
+      // Missing or locally unreadable ancestor rules are normal.
     }
     current = path.dirname(current);
   }
@@ -154,6 +184,7 @@ export function inventoryDepartmentContext({
   maxFiles = DEFAULT_MAX_FILES,
   maxFileBytes = DEFAULT_MAX_FILE_BYTES,
   maxAncestors = 4,
+  fileSystem: fileSystemOverrides = {},
 } = {}) {
   if (typeof workspace !== "string" || !path.isAbsolute(workspace)) {
     throw new TypeError("workspace must be an absolute path");
@@ -161,19 +192,25 @@ export function inventoryDepartmentContext({
   if (!Number.isInteger(maxFiles) || maxFiles < 1) {
     throw new TypeError("maxFiles must be a positive integer");
   }
-  const canonicalWorkspace = realpathSync(workspace);
-  if (!statSync(canonicalWorkspace).isDirectory()) {
+  const fileSystem = { ...DEFAULT_FILE_SYSTEM, ...fileSystemOverrides };
+  const canonicalWorkspace = fileSystem.realpathSync(workspace);
+  if (!fileSystem.statSync(canonicalWorkspace).isDirectory()) {
     throw new TypeError("workspace must be a directory");
   }
 
   const candidates = [];
-  walkWorkspace(canonicalWorkspace, canonicalWorkspace, candidates);
-  parentAgentCandidates(canonicalWorkspace, candidates, maxAncestors);
+  walkWorkspace(canonicalWorkspace, canonicalWorkspace, candidates, fileSystem);
+  parentAgentCandidates(canonicalWorkspace, candidates, maxAncestors, fileSystem);
   candidates.sort((left, right) => left.relativePath.localeCompare(right.relativePath, "en"));
 
   const sources = [];
   for (const candidate of candidates) {
-    const source = sourceMetadata(candidate.absolutePath, candidate.relativePath, maxFileBytes);
+    const source = sourceMetadata(
+      candidate.absolutePath,
+      candidate.relativePath,
+      maxFileBytes,
+      fileSystem,
+    );
     if (source) sources.push(source);
     if (sources.length >= maxFiles) break;
   }
@@ -182,9 +219,10 @@ export function inventoryDepartmentContext({
     repository: {
       present: (() => {
         try {
-          return lstatSync(path.join(canonicalWorkspace, ".git")).isDirectory();
-        } catch {
-          return false;
+          return fileSystem.lstatSync(path.join(canonicalWorkspace, ".git")).isDirectory();
+        } catch (error) {
+          if (isRecoverableFileSystemError(error)) return false;
+          throw error;
         }
       })(),
     },

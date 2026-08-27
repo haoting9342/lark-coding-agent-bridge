@@ -114,9 +114,28 @@ export class DepartmentCommandRuntime {
         safeReply(context, `${summary(state)}\n当前群已有部门创建记录；请继续、暂停或查看状态。`);
         return true;
       }
-      const contextInventory = context.currentWorkspace
-        ? this.inventoryContext(context)
-        : null;
+      if (!context.currentWorkspace) {
+        safeReply(
+          context,
+          "当前群尚未明确绑定 workspace，部门创建未启动，也不会扫描 profile 默认目录。请先用 /cd <工作区绝对路径> 定位并确认当前群工作区，再重试 /department create [部门名称]。",
+        );
+        return true;
+      }
+      let contextInventory;
+      try {
+        contextInventory = this.inventoryContext(context);
+      } catch (error) {
+        this.log({
+          event: "department_context_inventory_failed",
+          chatId: context.chatId,
+          error: error?.message ?? String(error),
+        });
+        safeReply(
+          context,
+          "部门创建未启动：已绑定 workspace 的上下文读取失败，且没有留下创建草案。请检查工作区是否存在且可访问，然后重试 /department create [部门名称]。",
+        );
+        return true;
+      }
       try {
         const started = this.designStore.start({
           ...metadata(context),

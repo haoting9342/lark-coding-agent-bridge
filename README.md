@@ -40,10 +40,11 @@ All product state is isolated under `~/.lark-channel-department`. Installation d
 In an allowed group, the app owner or bridge administrator sends:
 
 ```text
+/cd <absolute workspace path>
 /department create <department name>
 ```
 
-The group enters a department-design-only conversation. The agent safely inspects relevant workspace history, proposes either a permanent or project department, separates business lifecycle from request-specific agent protocols, and works through partial approvals, objections and amendments. At the final-confirmation phase, explicit `同意` or `确认` triggers atomic provisioning. The new group route works without a bridge restart.
+First bind an explicit workspace to the group with `/cd`. Without that mapping, `/department create` neither scans the profile default nor creates a draft. Once bound, the group enters a department-design-only conversation. The agent safely inspects relevant history inside that workspace, proposes either a permanent or project department, separates business lifecycle from request-specific agent protocols, and works through partial approvals, objections and amendments. At the final-confirmation phase, explicit `同意` or `确认` triggers atomic provisioning. The new group route works without a bridge restart.
 
 Controls:
 
