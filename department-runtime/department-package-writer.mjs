@@ -27,7 +27,10 @@ function orchestrationRules(policy) {
   ];
 }
 
-function renderDepartmentAgents(request, draft) {
+import path from 'node:path';
+import { workflowMaintenanceLines } from './department-overlay.mjs';
+
+export function renderDepartmentAgents(request, draft) {
   const protocols = (draft.taskProtocols ?? []).map((protocol) => [
     `## ${protocol.name}（${protocol.id}）`,
     '',
@@ -91,6 +94,11 @@ function renderDepartmentAgents(request, draft) {
     bulletList(draft.approvalBoundaries),
     '',
     protocols || '## 默认任务规程\n\n理解任务 → 澄清关键输入 → 执行 → 质量检查 → 交付。',
+    '',
+    ...workflowMaintenanceLines({
+      departmentId: request.departmentId,
+      workflowPath: request.workflowPath,
+    }),
     '',
   ].join('\n');
 }
@@ -158,6 +166,8 @@ export function buildDepartmentPackage(request, draft, confirmedAt) {
   };
   const workflow = {
     schemaVersion: 1,
+    revision: 1,
+    updatedAt: confirmedAt,
     semantics: 'task_execution',
     defaultFlow: draft.workflow,
     orchestrationPolicy: draft.orchestrationPolicy,
@@ -166,6 +176,7 @@ export function buildDepartmentPackage(request, draft, confirmedAt) {
     recurringWorkflows: draft.recurringWorkflows ?? [],
     milestones: draft.milestones ?? [],
     doneWhen: draft.doneWhen ?? [],
+    capabilityPlan: draft.capabilityPlan ?? [],
   };
   const existingAssets = {
     schemaVersion: 1,
@@ -185,7 +196,15 @@ export function buildDepartmentPackage(request, draft, confirmedAt) {
     ['workflow.json', json(workflow)],
     ['topology.json', json({ schemaVersion: 1, ...topology })],
     ['existing-assets.json', json(existingAssets)],
-    ['AGENTS.md', renderDepartmentAgents(request, draft)],
+    ['AGENTS.md', renderDepartmentAgents({
+      ...request,
+      workflowPath: request.workflowPath ?? path.join(
+        request.organizationRoot,
+        'departments',
+        request.departmentId,
+        'workflow.json',
+      ),
+    }, draft)],
     ['memory.md', renderMemory(draft)],
     ['skills-plan.md', renderSkillsPlan(draft)],
   ]);

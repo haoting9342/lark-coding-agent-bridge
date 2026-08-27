@@ -185,7 +185,7 @@ export class DepartmentProvisioner {
 
   provision(request) {
     const { draft, workspace } = validateRequest(request, this.organizationRoot, this.profileRoot);
-    const normalizedRequest = { ...request, workspace };
+    const normalizedRequest = { ...request, workspace, organizationRoot: this.organizationRoot };
     const registryFile = path.join(this.organizationRoot, 'company', 'department-registry.json');
     const routerFile = path.join(this.organizationRoot, 'router', 'group-router.json');
     const registry = ensureRegularJson(registryFile, 'department registry');
@@ -255,6 +255,7 @@ export class DepartmentProvisioner {
         departmentId: request.departmentId,
         departmentName: request.departmentName,
         draft,
+        workflowPath: path.join(finalDepartment, 'workflow.json'),
       });
       const agentsMode = existsSync(agentsFile) ? statSync(agentsFile).mode & 0o777 : 0o600;
       const temporaryAgents = `${agentsFile}.tmp-${transactionId}`;

@@ -26,7 +26,22 @@ function orchestrationLines(policy) {
   ];
 }
 
-export function renderDepartmentOverlay({ departmentId, departmentName, draft }) {
+export function workflowMaintenanceLines({ departmentId, workflowPath }) {
+  if (typeof workflowPath !== 'string' || !workflowPath.startsWith('/')) {
+    throw new Error('workflowPath must be an absolute path');
+  }
+  return [
+    '### 部门流程维护',
+    `- 权威工作流文件：\`${workflowPath}\`。不要依赖工作区内同名文件，也不要自行猜测控制面路径。`,
+    `- 先使用 \`lark-channel-bridge-department organization workflow show ${departmentId}\` 读取当前版本、SHA-256 和 apply 请求模板。`,
+    '- 用户说“这次”“当前这份”或“先这样做”时，只影响当前任务，不修改部门长期流程。',
+    '- 用户明确说“以后”“默认”“今后都按”或要求修改部门 workflow 时，结合已接受产物提出完整规程差异，允许逐项讨论和修改。',
+    '- 正式写入前必须展示影响范围，并取得“确认修改部门流程”或“同意修改部门流程”这类 workflow 专项授权；普通“好的”“可以”“同意”不足以授权写入。',
+    `- 获得专项授权后，通过标准输入调用 \`lark-channel-bridge-department organization workflow apply ${departmentId}\`；不得直接编辑权威 workflow。`,
+  ];
+}
+
+export function renderDepartmentOverlay({ departmentId, departmentName, draft, workflowPath }) {
   const protocols = (draft.taskProtocols ?? []).map((protocol) => [
     `### ${protocol.name}（${protocol.id}）`,
     `触发意图：${(protocol.intents ?? []).join('、') || '按名称匹配'}`,
@@ -51,6 +66,8 @@ export function renderDepartmentOverlay({ departmentId, departmentName, draft })
     '### 任务执行规程',
     protocols || '按用户具体任务先澄清、再执行、检查并交付。',
     '',
+    ...workflowMaintenanceLines({ departmentId, workflowPath }),
+    '',
     '部门业务阶段用于规划与状态管理，不作为每个用户任务都必须机械执行的步骤。',
     markerEnd(departmentId),
   ].join('\n');
@@ -62,4 +79,20 @@ export function mergeDepartmentOverlay(original, overlay, departmentId) {
     throw new Error(`workspace already contains department overlay: ${departmentId}`);
   }
   return `${content.trimEnd()}${content.trim() ? '\n\n' : ''}${overlay.trim()}\n`;
+}
+
+export function replaceDepartmentOverlay(original, overlay, departmentId) {
+  const content = String(original ?? '');
+  const start = markerStart(departmentId);
+  const end = markerEnd(departmentId);
+  const startIndex = content.indexOf(start);
+  const endIndex = content.indexOf(end);
+  if (startIndex < 0 || endIndex < startIndex) {
+    throw new Error(`workspace department overlay is missing: ${departmentId}`);
+  }
+  if (content.indexOf(start, startIndex + start.length) >= 0 || content.indexOf(end, endIndex + end.length) >= 0) {
+    throw new Error(`workspace contains duplicate department overlays: ${departmentId}`);
+  }
+  const after = endIndex + end.length;
+  return `${content.slice(0, startIndex)}${overlay.trim()}${content.slice(after)}`;
 }

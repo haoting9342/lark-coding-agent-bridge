@@ -167,6 +167,16 @@ describe('node-native department provisioner', () => {
       expect(agents).toContain('路径与摘要');
       expect(agents).toContain('不得因为存在书面计划');
     }
+    const authoritativeWorkflow = path.join(departmentRoot, 'workflow.json');
+    expect(workspaceAgents).toContain(`权威工作流文件：\`${authoritativeWorkflow}\``);
+    expect(workspaceAgents).toContain(
+      'lark-channel-bridge-department organization workflow show content_design',
+    );
+    expect(workspaceAgents).toContain(
+      'lark-channel-bridge-department organization workflow apply content_design',
+    );
+    expect(workspaceAgents).toContain('只影响当前任务，不修改部门长期流程');
+    expect(workspaceAgents).toContain('确认修改部门流程');
     expect(json(path.join(environment.organizationRoot, 'company', 'department-registry.json')).departments)
       .toContainEqual(expect.objectContaining({ id: 'content_design', kind: 'permanent' }));
     expect(json(path.join(environment.organizationRoot, 'router', 'group-router.json')).routes)

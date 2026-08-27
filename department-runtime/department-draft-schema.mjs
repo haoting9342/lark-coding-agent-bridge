@@ -681,6 +681,14 @@ function validateTaskProtocols(value, errors, requireReady) {
   }
 }
 
+export function assertTaskProtocols(input) {
+  const normalized = normalizeTaskProtocols(structuredClone(input));
+  const errors = [];
+  validateTaskProtocols(normalized, errors, true);
+  if (errors.length > 0) throw new DepartmentDraftValidationError(errors);
+  return normalized;
+}
+
 function isSafeRelativePath(value) {
   if (typeof value !== "string" || !value || path.isAbsolute(value) || value.includes("\0")) {
     return false;

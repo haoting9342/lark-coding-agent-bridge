@@ -56,3 +56,14 @@ Department roles are responsibility definitions, not a request to keep one Agent
 The default package permits at most two concurrent subagents, one execution Agent per bounded work item, one independent review per milestone, and one review round unless a new localized defect is found. Subagents receive a compact task packet and default to `fork_turns="none"`; large images, presentations, PDFs and logs are passed by workspace path plus summary.
 
 Quality checks are typed. `deterministic` checks use scripts or tools, `coordinator` checks stay with the primary Agent, `independent` checks may use a separate reviewer within the review budget, and `human` checks stop for explicit user approval. Generic software-development Skills must not replace a PPT, outline, report, research or content protocol merely because the task has a written plan.
+
+## Maintaining a task protocol after creation
+
+Normal task conversation remains model-driven. The bridge does not classify phrases such as “同意” or intercept workflow-edit requests after department creation. Generated `AGENTS.md` rules give the agent the authoritative workflow path and these stable commands:
+
+```bash
+lark-channel-bridge-department organization workflow show <department-id>
+lark-channel-bridge-department organization workflow apply <department-id>
+```
+
+The agent first distinguishes a one-task adjustment from a durable department default, reads the current workflow and accepted artifacts, discusses the proposed protocol diff, and asks for workflow-specific authorization such as `确认修改部门流程`. Generic agreement in ordinary task discussion is not write authorization. `apply` accepts a bounded JSON request on standard input, verifies the expected SHA-256 and protocol schema, creates backups, atomically updates the workflow and generated AGENTS references, and records a transaction receipt. Direct edits to the authoritative workflow are intentionally excluded from the generated operating contract.

@@ -74,6 +74,8 @@ Multi-host setup is deliberately separate from clean install. Read [organization
 ```bash
 lark-channel-bridge-department organization status
 lark-channel-bridge-department organization doctor
+lark-channel-bridge-department organization workflow show <department-id>
+lark-channel-bridge-department organization workflow apply <department-id>
 lark-channel-bridge-department profile list
 lark-channel-bridge-department ps
 lark-channel-bridge-department --help

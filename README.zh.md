@@ -74,6 +74,8 @@ lark-channel-bridge-department status
 ```bash
 lark-channel-bridge-department organization status
 lark-channel-bridge-department organization doctor
+lark-channel-bridge-department organization workflow show <department-id>
+lark-channel-bridge-department organization workflow apply <department-id>
 lark-channel-bridge-department profile list
 lark-channel-bridge-department ps
 lark-channel-bridge-department --help

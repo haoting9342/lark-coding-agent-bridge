@@ -26,6 +26,10 @@ import { runStart } from './commands/start';
 import { runUi } from './commands/ui';
 import { runOrganizationDoctor, runOrganizationStatus } from './commands/organization';
 import {
+  runOrganizationWorkflowApply,
+  runOrganizationWorkflowShow,
+} from './commands/organization-workflow';
+import {
   runOrganizationHandoffOperation,
   runOrganizationHandoffServe,
   runOrganizationHandoffStatus,
@@ -92,6 +96,24 @@ organization
   .action(async () => {
     const report = await runOrganizationDoctor();
     if (!report.ready) process.exitCode = 1;
+  });
+
+const organizationWorkflow = organization
+  .command('workflow')
+  .description('Inspect or safely update an existing department workflow');
+
+organizationWorkflow
+  .command('show <department-id>')
+  .description('Print the authoritative workflow, revision, and SHA-256')
+  .action(async (departmentId: string) => {
+    await runOrganizationWorkflowShow(departmentId);
+  });
+
+organizationWorkflow
+  .command('apply <department-id>')
+  .description('Apply one confirmed, hash-guarded workflow update request from stdin')
+  .action(async (departmentId: string) => {
+    await runOrganizationWorkflowApply(departmentId);
   });
 
 const organizationNode = organization
