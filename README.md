@@ -112,6 +112,21 @@ lark-cli 身份策略按 profile 隔离。每个 Agent 使用当前 profile 的 
 
 创建成功后无需重启 Bridge。必需 Skill 只有真正安装并验证成功后，部门才会完成创建；失败会回滚部门文件、注册表和路由，并保留草案供修订后重试。
 
+## WorkBuddy 本地创建部门
+
+WorkBuddy 已经负责飞书接入时，不需要再部署 Bridge。可以直接在 WorkBuddy 工作区创建部门规则：
+
+```bash
+lark-channel-bridge-department workbuddy create \
+  --workspace "/absolute/path/to/workspace" \
+  --name "自媒体部门" \
+  --purpose "负责内容策划、制作、发布和复盘" \
+  --responsibility "制定选题与内容计划" \
+  --responsibility "完成发布前质量检查"
+```
+
+该命令只写入工作区的 `AGENTS.md` 和 `.workbuddy-department/<部门编号>/` 部门包，不修改飞书配置、群路由或 Bridge 状态。完整规格也可以通过 `--spec <规格文件.json>` 一次导入；规格字段与 Codex 版共用，包含任务模式、按需规程、Skill 策略、能力计划和审批边界。详见[WorkBuddy 部门创建说明](./docs/workbuddy-department.md)。
+
 ## 任务执行方式
 
 每条消息先判断为以下一种模式：
