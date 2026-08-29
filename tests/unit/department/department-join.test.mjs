@@ -14,10 +14,12 @@ function fixture() {
   const organizationRoot = path.join(root, 'organizations', 'default');
   const profileRoot = path.join(root, 'profiles', 'codex');
   const workspace = path.join(root, 'writer-workspace');
+  const departmentRoot = path.join(organizationRoot, 'departments', 'writers');
   for (const directory of ['company', 'departments', 'router', 'transactions']) {
     mkdirSync(path.join(organizationRoot, directory), { recursive: true });
   }
   mkdirSync(workspace, { recursive: true });
+  mkdirSync(departmentRoot, { recursive: true });
   mkdirSync(profileRoot, { recursive: true });
   writeFileSync(path.join(organizationRoot, 'company', 'department-registry.json'), JSON.stringify({
     schemaVersion: 1,
@@ -39,6 +41,19 @@ function fixture() {
       profile: 'codex',
     }],
   }));
+  writeFileSync(path.join(departmentRoot, 'memory.md'), [
+    '# 已确认的部门记忆',
+    '',
+    '- 固定语气：克制、温暖。',
+    '- 每一段回复后追加“本段落产自作家部”。',
+    '',
+  ].join('\n'));
+  writeFileSync(path.join(workspace, 'AGENTS.md'), [
+    '# 作家部工作规则',
+    `- 权威部门记忆文件：\`${path.join(departmentRoot, 'memory.md')}\`。`,
+    '- 新会话开始前读取部门记忆和按需命中的规程。',
+    '',
+  ].join('\n'));
   const routes = new Map([['oc_original', workspace]]);
   const provisioner = new DepartmentProvisioner({
     organizationRoot,
@@ -54,6 +69,7 @@ function fixture() {
     organizationRoot,
     routerFile: path.join(organizationRoot, 'router', 'group-router.json'),
     workspace,
+    departmentRoot,
     routes,
     provisioner,
   };
@@ -109,6 +125,20 @@ describe('加入已有部门', () => {
 
     expect(readJson(value.routerFile).routes).toHaveLength(1);
     expect(replies.join('\n')).toMatch(/已经加入|已绑定/);
+  });
+
+  it('lets a new group session inherit the shared workflow entry and confirmed memory', () => {
+    const value = fixture();
+    const { context: input } = context();
+
+    runtime(value).handleDepartmentCommand('join writers', input);
+
+    const workspaceRules = readFileSync(path.join(value.workspace, 'AGENTS.md'), 'utf8');
+    const memory = readFileSync(path.join(value.departmentRoot, 'memory.md'), 'utf8');
+    const freshSessionContext = `${workspaceRules}\n${memory}`;
+    expect(freshSessionContext).toContain('权威部门记忆文件');
+    expect(freshSessionContext).toContain('克制、温暖');
+    expect(freshSessionContext).toContain('本段落产自作家部');
   });
 
   it('rejects an unknown department and leaves routes unchanged', () => {
