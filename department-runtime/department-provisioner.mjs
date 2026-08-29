@@ -381,6 +381,90 @@ export class DepartmentProvisioner {
     }
   }
 
+  join({ departmentId, chatId, profile }) {
+    if (typeof departmentId !== 'string' || !/^[a-z][a-z0-9_]*$/.test(departmentId)) {
+      throw new Error('部门编号无效，必须使用小写字母、数字和下划线');
+    }
+    if (typeof chatId !== 'string' || !/^oc_[A-Za-z0-9_-]+$/.test(chatId)) {
+      throw new Error('群聊编号无效');
+    }
+    if (typeof profile !== 'string' || !profile.trim()) {
+      throw new Error('当前配置身份无效');
+    }
+
+    const registryFile = path.join(this.organizationRoot, 'company', 'department-registry.json');
+    const routerFile = path.join(this.organizationRoot, 'router', 'group-router.json');
+    const lockFile = path.join(this.organizationRoot, 'transactions', '.department-provision.lock');
+    let releaseLock;
+    try {
+      releaseLock = acquireDirectoryLock(lockFile);
+    } catch {
+      throw new Error('另一个部门事务正在执行，请稍后重试');
+    }
+
+    try {
+      const registry = ensureRegularJson(registryFile, 'department registry');
+      const router = ensureRegularJson(routerFile, 'group router');
+      if (!Array.isArray(registry.departments) || !Array.isArray(router.routes)) {
+        throw new Error('组织注册表或群路由结构无效');
+      }
+      const department = registry.departments.find((item) => item?.id === departmentId);
+      if (!department) throw new Error(`部门不存在：${departmentId}`);
+      if (department.profile && department.profile !== profile) {
+        throw new Error(`部门属于配置身份 ${department.profile}，当前身份不能加入`);
+      }
+      if (typeof department.workspace !== 'string' || !path.isAbsolute(department.workspace)) {
+        throw new Error('部门工作区无效');
+      }
+      const workspace = validateWorkspace(department.workspace, this.organizationRoot, this.profileRoot);
+      const existing = router.routes.find((item) => item?.chatId === chatId);
+      if (existing) {
+        const sameDepartment = existing.departmentId === departmentId
+          && path.resolve(existing.workspace ?? '') === workspace
+          && (existing.profile ?? profile) === profile;
+        if (!sameDepartment) throw new Error('当前群已经绑定其他部门');
+        this.routeController.apply({ chatId, cwd: workspace });
+        return {
+          status: 'already_joined',
+          departmentId,
+          departmentName: department.name,
+          chatId,
+          workspace,
+          profile,
+        };
+      }
+
+      const previousRoute = this.routeController.current(chatId);
+      const routerSnapshot = snapshotFile(routerFile);
+      let routeApplied = false;
+      try {
+        writeJsonAtomic(routerFile, {
+          ...router,
+          routes: [...router.routes, { chatId, departmentId, workspace, profile }],
+        });
+        const routeResult = this.routeController.apply({ chatId, cwd: workspace });
+        if (routeResult && typeof routeResult.then === 'function') {
+          throw new Error('routeController.apply() must be synchronous');
+        }
+        routeApplied = true;
+        return {
+          status: 'joined',
+          departmentId,
+          departmentName: department.name,
+          chatId,
+          workspace,
+          profile,
+        };
+      } catch (error) {
+        if (routeApplied) this.routeController.restore(chatId, previousRoute);
+        restoreFile(routerSnapshot);
+        throw error;
+      }
+    } finally {
+      releaseLock();
+    }
+  }
+
   #maybeFail(stage) {
     if (this.failAfter === stage) throw new Error(`injected failure after ${stage}`);
   }

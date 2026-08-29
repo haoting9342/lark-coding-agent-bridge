@@ -92,6 +92,8 @@ lark-cli 身份策略按 profile 隔离。每个 Agent 使用当前 profile 的 
 /department create 自媒体部 --workspace /absolute/path/to/workspace
 ```
 
+已有部门可以绑定到新的飞书群。由 Bridge 管理员在新群执行 `/department join <部门编号>`，命令立即生效，不复制原群聊天记录；新群的新会话会使用该部门的工作区、章程、命中规程和稳定记忆。
+
 正确顺序如下：
 
 1. 确认部门名称和工作路径；

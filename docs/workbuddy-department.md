@@ -21,6 +21,8 @@ lark-channel-bridge-department workbuddy department init \
 
 初始化只会创建部门设计入口、中文助手 Skill 和草案目录，不会创建正式部门。重复执行不会重复添加入口。
 
+同一个 WorkBuddy 项目中新建会话时不需要额外的“加入部门”命令。只要会话仍打开这个工作区，WorkBuddy 就会从 `CODEBUDDY.md` 加载部门入口，再按任务读取部门章程、命中规程和 `.workbuddy-department/<部门编号>/memory.md`。新会话不会继承上一轮聊天全文，只继承已经确认并写入稳定记忆的内容。
+
 ## 三、与 WorkBuddy 自由讨论
 
 打开这个项目后，可以直接对 WorkBuddy 说：“帮我设计一个负责内容生产的部门”。设计助手会逐步与你讨论部门目标、职责、范围外事项、审批边界、常见任务、能力和交付标准，不要求一次填完表格。

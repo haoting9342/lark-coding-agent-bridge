@@ -142,8 +142,32 @@ export class DepartmentCommandRuntime {
     const createName = create.name;
     const state = this.designStore.getFor(context);
 
-    if (["create", "status", "pause", "resume", "cancel"].includes(subcommand) && !isGroup(context)) {
-      safeReply(context, "部门创建只能在群聊中使用。");
+    if (["create", "join", "status", "pause", "resume", "cancel"].includes(subcommand) && !isGroup(context)) {
+      safeReply(context, "部门创建和加入只能在群聊中使用。");
+      return true;
+    }
+
+    if (subcommand === "join") {
+      const departmentId = commandParts[1];
+      if (!departmentId) {
+        safeReply(context, "用法：/department join <部门编号>");
+        return true;
+      }
+      try {
+        const result = this.provisioner.join({
+          departmentId,
+          chatId: context.chatId,
+          profile: context.profile,
+        });
+        safeReply(
+          context,
+          result.status === "already_joined"
+            ? `当前群已经加入部门“${result.departmentName}”，继续使用工作区：${result.workspace}`
+            : `当前群已加入部门“${result.departmentName}”。\n工作区：${result.workspace}\n新会话将继承该部门的章程、命中规程和稳定记忆。`,
+        );
+      } catch (error) {
+        safeReply(context, `加入部门失败：${error?.message ?? String(error)}`);
+      }
       return true;
     }
 
@@ -240,7 +264,7 @@ export class DepartmentCommandRuntime {
 
     safeReply(
       context,
-      "用法：/department create、/department status、/department pause、/department resume、/department cancel",
+      "用法：/department create、/department join <部门编号>、/department status、/department pause、/department resume、/department cancel",
     );
     return true;
   }
