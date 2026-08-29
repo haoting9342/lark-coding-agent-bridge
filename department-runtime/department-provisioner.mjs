@@ -18,6 +18,7 @@ import { mergeDepartmentOverlay, renderDepartmentOverlay } from './department-ov
 import { buildDepartmentPackage } from './department-package-writer.mjs';
 import { validateDepartmentPackage } from './department-package-validator.mjs';
 import { TransactionJournal, writeJsonAtomic } from './transaction-journal.mjs';
+import { acquireDirectoryLock } from './directory-lock.mjs';
 
 const EMPTY_CAPABILITY_RESULT = Object.freeze({
   schemaVersion: 1,
@@ -214,9 +215,9 @@ export class DepartmentProvisioner {
     let routeApplied = false;
     let currentStage = 'lock';
 
-    mkdirSync(path.dirname(lock), { recursive: true, mode: 0o700 });
+    let releaseLock;
     try {
-      mkdirSync(lock, { mode: 0o700 });
+      releaseLock = acquireDirectoryLock(lock);
     } catch {
       throw new Error('another department transaction is active');
     }
@@ -315,6 +316,12 @@ export class DepartmentProvisioner {
         workspace,
         capabilities: draft.capabilityPlan.filter((capability) => capability.nodeId === localNode.id),
       });
+      const unresolvedRequired = (capabilityMaterialization.capabilities ?? [])
+        .filter((capability) => capability.required === true && !['available', 'installed'].includes(capability.status))
+        .map((capability) => capability.id);
+      if (unresolvedRequired.length > 0) {
+        throw new Error(`required capability is not ready: ${unresolvedRequired.join(', ')}`);
+      }
       journal.step('capability_materialization', {
         status: capabilityMaterialization.status,
         counts: capabilityMaterialization.counts,
@@ -370,7 +377,7 @@ export class DepartmentProvisioner {
       journal.finish('failed', { stage: error.stage, error: error.message });
       throw error;
     } finally {
-      rmSync(lock, { recursive: true, force: true });
+      releaseLock();
     }
   }
 

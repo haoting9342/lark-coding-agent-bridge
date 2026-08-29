@@ -54,8 +54,8 @@ export function validateDepartmentPackage(directory, expected) {
   if (workflow.schemaVersion !== 1 || workflow.semantics !== 'task_execution') {
     throw new Error('department workflow semantics are invalid');
   }
-  if (!Array.isArray(workflow.taskProtocols) || workflow.taskProtocols.length === 0) {
-    throw new Error('department package requires at least one task protocol');
+  if (!Array.isArray(workflow.taskProtocols)) {
+    throw new Error('department package task protocols must be an array');
   }
   if (
     !new Set(['adaptive', 'coordinator_only', 'delegated']).has(workflow.orchestrationPolicy?.mode)

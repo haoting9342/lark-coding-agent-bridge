@@ -1,72 +1,114 @@
-# Department creation contract
+# 部门创建说明
 
-`lark-channel-bridge-department` turns one Feishu group into a governed department through conversation. It does not ship or migrate anyone else's existing departments.
+`lark-channel-bridge-department` 通过群聊把一个飞书群配置为受治理的部门。安装包不携带预制部门，也不会迁移其他用户的部门数据。
 
-## Start and control a design
+## 启动与控制
 
-Only the Feishu app owner or a configured bridge administrator can start a design, and creation is available only in a group:
+只有飞书应用所有者或已配置的 Bridge 管理员可以在群聊中启动创建：
 
 ```text
-/cd <absolute workspace path>
-/department create <department name>
+/department create
+/department create <部门名称> --workspace <工作区绝对路径>
 /department status
 /department pause
 /department resume
 /department cancel
 ```
 
-Workspace selection is an operational prerequisite rather than a department business field. The current scope, or its Feishu group when the scope is a topic, must already have an explicit workspace mapping. A profile-level `workspaces.default` is never treated as authorization to inventory that directory. When the group is unmapped, creation returns `/cd` guidance without scanning, creating a draft or reserving the group.
+不再要求先执行 `/cd`。如果启动时没有提供名称或路径，Agent 会先在对话中询问；在名称、路径、主题和职责确认前，不扫描工作区。
 
-Natural-language equivalents are also accepted for pause and resume. Pausing preserves the draft and returns the group to normal agent work. While a design is active, the group is intentionally reserved for department design; unrelated requests are not executed.
+暂停会保留草案，并让群聊恢复普通 Agent 工作；继续后重新进入部门设计。创建进行时，该群只处理部门设计内容，避免普通任务污染草案。
 
-## Conversation model
+## 正确的设计顺序
 
-The department name is the one business field chosen directly by the user. After workspace binding, the agent inventories safe historical context from that workspace, including `AGENTS.md`, READMEs, worklogs and plans, then proposes the rest for discussion. Inventory recursively stays inside the selected workspace; only a bounded set of inherited parent `AGENTS.md` files is checked, without scanning parent or sibling directories. Secret-like files, bridge state, SSH state, dependency trees and oversized files are excluded.
+1. 用户明确部门名称；
+2. 用户明确工作区绝对路径；
+3. 讨论并确认部门主题、目标和主要职责；
+4. 系统使用这些主题词定向盘点工作区；
+5. 讨论部门边界、审批要求、稳定任务规程和能力计划；
+6. 展示最终方案并等待明确确认；
+7. 事务创建部门、安装能力并启用路由。
 
-The proposal must distinguish:
+工作区盘点默认最多选择 30 个相关文件，单文件最大 1 MiB。它会优先选择名称与部门主题相关的规则、说明、计划和交付物，排除密钥、环境文件、Bridge 状态、SSH 状态、依赖目录和符号链接。盘点只向 Agent 提供安全元数据，不直接注入全部文件正文。
 
-- a permanent department's mission, service catalog and recurring responsibilities;
-- a project department's objective, milestone, deadline, deliverables and closeout;
-- the business lifecycle being managed from the task protocols the agent follows for each request;
-- responsibility and out-of-scope boundaries;
-- capability requirements, installation policy and verification;
-- optional node ownership and safe handoff rules.
+## 任务模式与规程
 
-During discussion, ordinary phrases such as “可以” or “好的” may accept the current suggestion or one specified part. Rejections and partial amendments remain valid. Final provisioning happens only in the final-confirmation phase and only after the department administrator replies with an explicit final `同意` or `确认`.
+部门创建时不要求所有任务都有固定规程。每次真实任务先判断为：
 
-## Provisioning result
+- 直接执行：目标明确、风险低、不需要稳定流程；
+- 单规程：明确命中一个已确认规程；
+- 组合规程：确实跨越多个已确认规程；
+- 自由探索：新任务、目标不确定或现有规程不适用。
 
-Final confirmation performs one transactional write. The bridge validates the complete draft, snapshots affected files, creates the department package, materializes permitted capabilities, adds the workspace `AGENTS.md` overlay, writes the department registry and updates the group route. A failed required write rolls back the transaction. Repeating final confirmation is idempotent.
+长期业务生命周期与单次任务规程必须分开。业务生命周期只用于端到端业务推进或项目管理，不能机械套到每条消息。
 
-The organization is stored under:
+生成的 `AGENTS.md` 只保存规程名称、编号、触发意图和提取命令，不保存完整步骤。命中后只提取需要的一个规程：
+
+```bash
+lark-channel-bridge-department organization workflow protocol <部门编号> <规程编号>
+```
+
+每个规程包含：
+
+- `contextPolicy`：限定相关上下文、排除项、最大文件数和文件大小；
+- `skillPolicy`：最多一个主 Skill，以及带明确命中条件的辅助 Skill；
+- 专业步骤、质量检查、交付物、完成条件和修改规则；
+- 可选的执行节点与故障转移策略。
+
+没有值得固化的高频任务时，`taskProtocols` 可以为空。后续遇到新任务时先自由探索，用户确认其值得长期复用后再沉淀为规程。
+
+## 确认规则
+
+设计讨论中，`可以`、`好的` 可以接受上一条明确建议或指定部分，也可以继续否决和修改。
+
+只有进入最终确认阶段后，管理员无附加修改地回复以下内容才会创建部门：
+
+```text
+同意
+确认
+同意创建
+确认创建
+按这个方案创建
+```
+
+普通成员可以提供建议，但不能修改草案、暂停流程或最终确认。
+
+## 能力安装与事务回滚
+
+`capabilityPlan` 是唯一可执行的能力安装合同。任务规程中的 Skill 名称不是安装指令。
+
+低风险且来源、固定版本、安装范围和验证方式都明确的能力可以在最终确认后自动安装。需要 OAuth、密钥、个人身份、系统权限或缺少受支持适配器的能力必须先解决授权或改为可选项。
+
+必需能力只有处于“已存在”或“已安装”状态时，部门创建才算成功。任一必需能力安装、来源校验或清单验证失败，系统会回滚：
+
+- 部门包；
+- 工作区 `AGENTS.md` 覆盖；
+- 部门注册表；
+- 群路由；
+- 本次事务中新安装的能力。
+
+草案和失败回执会保留，管理员修订能力计划后可以再次明确确认。可选能力可以记录待授权或待人工处理，但不得虚报为已安装。
+
+## 创建后的文件与维护
+
+默认组织位于：
 
 ```text
 ~/.lark-channel-department/organizations/default/
 ```
 
-Each department contains structured `department.json`, `workflow.json`, `topology.json`, capability status, `AGENTS.md`, memory and skills-plan artifacts. A newly written group route takes effect without restarting the bridge.
+每个部门包含 `department.json`、`workflow.json`、`topology.json`、`AGENTS.md`、`memory.md`、`skills-plan.md` 和已有资产索引。群路由写入后立即生效，无需重启 Bridge。
 
-Capability results are truthful rather than optimistic: built-in, local and fixed GitHub sources can be materialized when their policy permits it; authorization-required, manual, conflicting or failed capabilities are recorded as pending instead of being reported as installed.
-
-## What a task protocol means
-
-A task protocol describes how the agent handles a specific user request. For example, “make a presentation” can require narrative structure, visual consistency, source checks, rendering and final quality review. It is not the same as the department's business lifecycle, such as all stages needed to prepare a public course. The confirmed package keeps these layers separate.
-
-## Adaptive Agent orchestration
-
-Department roles are responsibility definitions, not a request to keep one Agent process running for every role. Workflow steps and quality gates also do not automatically create subagents. A generated department uses an `adaptive` orchestration policy by default: the coordinator handles continuous and tightly coupled work, while subagents are reserved for independent parallel work, specialized capabilities, valuable high-risk review, or work large enough to justify handoff overhead.
-
-The default package permits at most two concurrent subagents, one execution Agent per bounded work item, one independent review per milestone, and one review round unless a new localized defect is found. Subagents receive a compact task packet and default to `fork_turns="none"`; large images, presentations, PDFs and logs are passed by workspace path plus summary.
-
-Quality checks are typed. `deterministic` checks use scripts or tools, `coordinator` checks stay with the primary Agent, `independent` checks may use a separate reviewer within the review budget, and `human` checks stop for explicit user approval. Generic software-development Skills must not replace a PPT, outline, report, research or content protocol merely because the task has a written plan.
-
-## Maintaining a task protocol after creation
-
-Normal task conversation remains model-driven. The bridge does not classify phrases such as “同意” or intercept workflow-edit requests after department creation. Generated `AGENTS.md` rules give the agent the authoritative workflow path and these stable commands:
+修改长期任务规程时，先读取版本和 SHA-256：
 
 ```bash
-lark-channel-bridge-department organization workflow show <department-id>
-lark-channel-bridge-department organization workflow apply <department-id>
+lark-channel-bridge-department organization workflow show <部门编号>
 ```
 
-The agent first distinguishes a one-task adjustment from a durable department default, reads the current workflow and accepted artifacts, discusses the proposed protocol diff, and asks for workflow-specific authorization such as `确认修改部门流程`. Generic agreement in ordinary task discussion is not write authorization. `apply` accepts a bounded JSON request on standard input, verifies the expected SHA-256 and protocol schema, creates backups, atomically updates the workflow and generated AGENTS references, and records a transaction receipt. Direct edits to the authoritative workflow are intentionally excluded from the generated operating contract.
+只有用户明确授权“确认修改部门流程”后，才通过受限 JSON 请求执行：
+
+```bash
+lark-channel-bridge-department organization workflow apply <部门编号>
+```
+
+更新操作会校验旧哈希、备份原文件、原子更新工作流和精简索引，并写入事务回执。不要直接编辑权威工作流文件。

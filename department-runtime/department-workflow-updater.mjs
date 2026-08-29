@@ -17,6 +17,7 @@ import {
   replaceDepartmentOverlay,
 } from './department-overlay.mjs';
 import { renderDepartmentAgents } from './department-package-writer.mjs';
+import { acquireDirectoryLock } from './directory-lock.mjs';
 
 const CONFIRMATIONS = new Set([
   '确认修改部门流程',
@@ -115,7 +116,6 @@ function applyOperations(protocols, operations) {
       next.push(structuredClone(operation.value));
     } else {
       if (index < 0) throw new Error(`task protocol is missing: ${protocolId}`);
-      if (next.length === 1) throw new Error('cannot remove the last task protocol');
       next.splice(index, 1);
     }
     changed.push(protocolId);
@@ -183,6 +183,21 @@ export class DepartmentWorkflowUpdater {
     };
   }
 
+  protocol(departmentIdValue, protocolIdValue) {
+    const departmentId = validateDepartmentId(departmentIdValue);
+    const protocolId = validateDepartmentId(protocolIdValue);
+    const workflowPath = path.join(this.organizationRoot, 'departments', departmentId, 'workflow.json');
+    const workflow = readJson(workflowPath, 'department workflow');
+    const protocol = (workflow.taskProtocols ?? []).find((item) => item?.id === protocolId);
+    if (!protocol) throw new Error(`task protocol is missing: ${protocolId}`);
+    return {
+      schemaVersion: 1,
+      departmentId,
+      revision: Number.isInteger(workflow.revision) ? workflow.revision : 1,
+      protocol: structuredClone(protocol),
+    };
+  }
+
   apply(departmentIdValue, request) {
     const departmentId = validateDepartmentId(departmentIdValue);
     validateRequest(request);
@@ -225,9 +240,9 @@ export class DepartmentWorkflowUpdater {
     const backupRoot = path.join(this.organizationRoot, 'backups', transactionId);
     const receiptPath = path.join(this.organizationRoot, 'transactions', `${transactionId}.json`);
     const lock = path.join(this.organizationRoot, 'transactions', `.workflow-${departmentId}.lock`);
-    mkdirSync(path.dirname(lock), { recursive: true, mode: 0o700 });
+    let releaseLock;
     try {
-      mkdirSync(lock, { mode: 0o700 });
+      releaseLock = acquireDirectoryLock(lock);
     } catch {
       throw new Error(`department workflow is busy: ${departmentId}`);
     }
@@ -289,7 +304,7 @@ export class DepartmentWorkflowUpdater {
       rmSync(receiptPath, { force: true });
       throw error;
     } finally {
-      rmSync(lock, { recursive: true, force: true });
+      releaseLock();
     }
   }
 

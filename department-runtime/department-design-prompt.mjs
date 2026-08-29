@@ -2,6 +2,8 @@ function safeInventory(inventory) {
   if (!inventory || typeof inventory !== "object") return null;
   return {
     workspace: inventory.workspace ?? null,
+    requestedWorkspace: inventory.requestedWorkspace ?? null,
+    contextQuery: inventory.contextQuery ?? null,
     repository: inventory.repository ?? null,
     truncated: inventory.truncated ?? false,
     sources: Array.isArray(inventory.sources)
@@ -47,6 +49,7 @@ export function buildDepartmentDesignPrompt({
   userText,
   actor,
   contextInventory,
+  contextInventoryError,
   draftCli,
   storeFile,
 } = {}) {
@@ -75,21 +78,21 @@ export function buildDepartmentDesignPrompt({
 - 核心任务规程 taskProtocols：针对 PPT、大纲、研究、报告等具体交付类型分别设计输入、澄清策略、专业步骤、质量检查、完成条件、交付物、修改循环和 Skills 映射；
 - 业务生命周期 businessLifecycle：真实业务或项目从启动到结束的阶段，只在用户明确要求完整推进、端到端交付或项目管理时启用。
 
-不得把业务生命周期写入通用任务周期，也不得让单项任务依次执行整个部门或项目流程。收到具体请求时，只执行与用户意图匹配的一个或多个任务规程；如果需要组合多个规程，要说明依赖关系。每个核心任务规程都要有可验证的质量门禁和可直接使用的交付物合同，不能只写“执行、检查、交付”之类空泛步骤。
+不得把业务生命周期写入通用任务周期，也不得让单项任务依次执行整个部门或项目流程。收到具体请求时，先在 direct、protocol、composite、exploratory 四种模式中判断：明确且低风险的普通任务直接执行；唯一命中时按需读取一个规程；确实跨规程时只组合命中的规程；新任务或不确定任务先自由探索。不是所有任务都必须命中 taskProtocol，不得为了形式完整而强行创建或套用规程。每个真正需要沉淀的任务规程都要有可验证的质量门禁和可直接使用的交付物合同，不能只写“执行、检查、交付”之类空泛步骤。
 
 必须设计 orchestrationPolicy，但默认采用 adaptive，不得强制单代理，也不得把专业角色机械变成 Agent 进程。角色不等于 Agent 实例，流程节点不等于子代理，质量门禁也不等于独立审查代理。只有任务可独立并行、需要专门能力、独立高风险复核能明显降低风险，或规模足以抵消派工成本时才建议委派。默认最多并行 2 个子代理、每个工作项 1 个执行代理、每个里程碑 1 次独立复核和 1 轮复审；子代理默认使用 fork_turns="none" 和精简任务包，大型图片、PPT、PDF、日志与扫描结果通过工作区路径和摘要传递。
 
 质量检查必须标注 method 和 trigger。deterministic 用脚本或确定性工具；coordinator 由主代理检查；independent 才允许创建独立复核 Agent；human 必须等待用户确认。不得仅因存在书面计划，就让软件开发型 Skill 的 worker、规格审查、代码质量审查流程覆盖部门规程。subagent-driven-development 等开发执行流程只适用于真实代码实现，不适用于 PPT、大纲、报告、研究或内容生产。
 
-创建顺序如下：先结合历史上下文和用户给出的代表性任务提取核心服务，再为每个核心服务提出完整任务规程；把长期业务阶段或项目阶段单独写入业务生命周期；盘点已有 Skills、脚本和工具并建立 task protocol 到 Skills 的映射。对用户明确接受的工具链必须建立结构化 capabilityPlan：已有能力验证并绑定；来源、固定版本、安装范围和验证方式明确的低风险能力，在最终确认后自动安装和物化；需要 OAuth、密钥、个人身份、系统权限或不受支持适配器的能力必须标为 approval_required 或 manual，保持待授权，不得静默跳过或宣称已可用。
+创建顺序必须是：先确认部门名称和工作路径；再确认部门主题、目标和主要职责；之后才按主题定向扫描工作区并收集相关上下文。不得在主题确认前扫描整个工作区。扫描完成后再提取稳定服务，只有高频、边界清晰、值得复用的任务才建立完整规程；把长期业务阶段或项目阶段单独写入业务生命周期。盘点能力时按具体任务建立 skillPolicy：最多一个主 Skill，辅助 Skill 只有在 when 条件确实命中时才加载；不得遍历或加载所有已安装 Skill。每个规程同时建立 contextPolicy，限制相关路径、排除项、文件数量和单文件大小。对用户明确接受的工具链必须建立结构化 capabilityPlan：已有能力验证并绑定；来源、固定版本、安装范围和验证方式明确的低风险能力，在最终确认后自动安装和物化；需要 OAuth、密钥、个人身份、系统权限或不受支持适配器的能力必须标为 approval_required 或 manual，保持待授权，不得静默跳过或宣称已可用。
 
-taskProtocols[*].skills 只用于任务路由和可读说明，不能作为可执行安装指令。不得把“之后安装”“外部候选”之类说明文字塞进 Skill 名称并假装已经形成安装计划。外部能力若缺少可信来源、固定 ref/版本、scope、installPolicy 或 verification，只能记录为能力缺口，不能设置 auto。只有用户已经对该能力的准确来源和用途作出局部确认，才可使用 installPolicy=auto；最终部门确认同时授权这些已经逐项确认的低风险物化项。
+taskProtocols[*].skills 只作为旧草稿兼容字段，不能作为可执行安装指令；新草稿以 skillPolicy 为准。不得把“之后安装”“外部候选”之类说明文字塞进 Skill 名称并假装已经形成安装计划。外部能力若缺少可信来源、固定 ref/版本、scope、installPolicy 或 verification，只能记录为能力缺口，不能设置 auto。只有用户已经对该能力的准确来源和用途作出局部确认，才可使用 installPolicy=auto；最终部门确认同时授权这些已经逐项确认的低风险物化项。
 
 多主机、多 Agent 场景必须额外设计 organizationTopology，但先用自然语言向用户展示组织摘要并确认，不能要求用户理解或手写 YAML。一个部门恰好有一个主节点；主节点负责治理、最终答复和共享记忆，辅助节点只执行能力边界内的任务。每个任务规程通过 executionPolicy 指定 coordinatorNodeId、preferredNodeId、requiredCapabilities、verifierRoleId、deliveryMode、failoverPolicy、最大静默时间和最小 contextScopes。固定角色类型是 coordinator、executor、verifier，允许增加领域角色；这些是责任角色，不代表必须创建对应 Agent 实例，具体实例只能按 orchestrationPolicy 的触发条件临时创建。
 
 能力必须通过 capabilityPlan[*].nodeId 归属到节点。已有本地能力使用 bindingMode=bind_existing 验证并绑定，不复制、不重装；登录态或设备身份能力设置 identityBound=true，凭证和浏览器资料不得离开所属节点。身份、发布、消息和设备操作不得自动故障转移。只有明确低风险且幂等的任务才可使用自动故障转移。direct_with_receipt 只允许用于用户已经确认的周期任务；普通即时对话一律由辅助节点返回证据，再由主节点通过 primary_synthesized 汇总答复。
 
-核心高频任务必须在最终确认前完成规程设计。长尾任务采用“首次遇到时小型脑暴、用户确认后沉淀”的方式，不得预先制造大量空泛规程。最终方案展示前，至少用两条单项任务消息和一条端到端项目消息做代表性消息模拟，向用户说明分别会命中哪个规程、是否启用业务生命周期，并根据反馈修订。
+已明确且高频的核心任务应在最终确认前完成规程设计；如果当前没有这样的任务，taskProtocols 可以为空。长尾任务、新任务和探索任务采用“首次遇到时小型脑暴、用户确认后再沉淀”的方式，不得预先制造大量空泛规程。最终方案展示前，用代表性消息模拟 direct、protocol、composite、exploratory 中实际适用的模式，并说明是否启用业务生命周期，再根据反馈修订。
 
 写入草稿时使用以下精确字段结构；字段名不得自行改写：
 businessLifecycle: ["业务阶段一", "业务阶段二"]
@@ -110,6 +113,18 @@ taskProtocols: [{
   "deliverables": ["可直接使用的交付物"],
   "completionCriteria": ["完成条件"],
   "skills": ["已盘点并适用的 Skill 名称"],
+  "contextPolicy": {
+    "mode": "targeted",
+    "include": ["当前用户请求", "已确认部门事实", "命中规程所需输入"],
+    "exclude": ["无关工作区文件", "敏感信息"],
+    "maxFiles": 20,
+    "maxFileBytes": 1048576
+  },
+  "skillPolicy": {
+    "primary": "一个主 Skill，或 null",
+    "auxiliaries": [{ "skill": "辅助 Skill", "when": "明确命中条件" }],
+    "maxAuxiliaries": 2
+  },
   "revisionPolicy": "用户提出修改后的处理规则"
   ,"executionPolicy": {
     "coordinatorNodeId": "主节点 ID",
@@ -194,7 +209,9 @@ node ${JSON.stringify(draftCli)} --store ${JSON.stringify(storeFile)} --session-
 每次面向用户的回复末尾必须显示：当前状态、部门类型、草案版本和待确认项数量。当前状态=${state.status}/${state.phase}；版本=${state.version}；待确认=${questions}。
 
 以下上下文盘点只含安全元数据，不含文件正文或其他部门会话：
-BEGIN_SAFE_CONTEXT_INVENTORY
+${contextInventoryError
+    ? `本轮定向盘点失败。必须向用户说明路径或读取问题，并在修正后重新盘点；不得把缺失上下文当作已完成扫描。\nBEGIN_CONTEXT_INVENTORY_ERROR\n${String(contextInventoryError).slice(0, 500)}\nEND_CONTEXT_INVENTORY_ERROR\n`
+    : ""}BEGIN_SAFE_CONTEXT_INVENTORY
 ${JSON.stringify(inventory, null, 2)}
 END_SAFE_CONTEXT_INVENTORY
 

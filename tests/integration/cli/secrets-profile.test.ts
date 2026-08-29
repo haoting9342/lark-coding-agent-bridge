@@ -31,12 +31,14 @@ async function makeRoot(): Promise<string> {
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   clearKeystoreDerivedKeyCache();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
 describe('profile-aware secrets commands', () => {
   it('resolves secrets active-first, then by profile name, and warns on duplicates', async () => {
+    vi.stubEnv('LARK_CHANNEL_PROFILE', 'foreign-bridge-profile');
     const root = await makeRoot();
     await writeProfiles(root, 'codex-dev', ['alpha', 'codex-dev', 'zeta']);
     const duplicate = secretKeyForApp('cli_duplicate');

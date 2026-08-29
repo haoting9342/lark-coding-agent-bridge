@@ -122,6 +122,18 @@ function provisioner(environment, options = {}) {
 }
 
 describe('node-native department provisioner', () => {
+  it('creates a department that intentionally has no predefined task protocol', () => {
+    const environment = fixture();
+    const input = request(environment);
+    input.draft.taskProtocols = [];
+
+    const result = provisioner(environment).instance.provision(input);
+
+    expect(result.status).toBe('completed');
+    expect(json(path.join(environment.organizationRoot, 'departments', 'content_design', 'workflow.json')).taskProtocols)
+      .toEqual([]);
+  });
+
   it('atomically writes a complete department package and preserves existing AGENTS.md content', () => {
     const environment = fixture();
     const { instance, routes } = provisioner(environment);
@@ -161,6 +173,13 @@ describe('node-native department provisioner', () => {
       /# Existing rules[\s\S]*lark-channel-bridge-department:start content_design/,
     );
     for (const agents of [packageAgents, workspaceAgents]) {
+      expect(agents).toContain('直接执行');
+      expect(agents).toContain('单规程');
+      expect(agents).toContain('组合规程');
+      expect(agents).toContain('自由探索');
+      expect(agents).toContain('organization workflow protocol content_design create_outline');
+      expect(agents).not.toContain('整合知识 → 设计结构');
+      expect(agents).not.toContain('结构合理；表达自然');
       expect(agents).toContain('角色是职责定义，不等于常驻或必启 Agent 进程');
       expect(agents).toContain('fork_turns="none"');
       expect(agents).toContain('最多同时运行 2 个子代理');
@@ -252,5 +271,33 @@ describe('node-native department provisioner', () => {
     expect(result.capabilitySummary.installed).toBe(1);
     expect(existsSync(path.join(environment.workspace, '.agents', 'skills', 'outline-style', 'SKILL.md'))).toBe(true);
     expect(json(result.receiptPath).capabilityMaterialization.capabilities[0].status).toBe('installed');
+  });
+
+  it('rolls back the department when a required capability is not ready', () => {
+    const environment = fixture();
+    const input = request(environment);
+    input.draft.capabilityPlan = [{
+      id: 'required-research', kind: 'builtin', required: true, scope: 'host',
+      installPolicy: 'auto', nodeId: 'local_primary', bindingMode: 'bind_existing', identityBound: false,
+      source: { type: 'builtin', name: 'required-research' },
+      verification: { type: 'builtin_registry' },
+    }];
+    const routes = new Map([['oc_content_design', '/previous']]);
+    const capabilityMaterializer = {
+      materialize: () => ({
+        schemaVersion: 1,
+        status: 'created_with_pending_capabilities',
+        counts: { available: 0, installed: 0, pending_authorization: 0, pending_manual: 0, conflict: 0, failed: 1 },
+        capabilities: [{ id: 'required-research', required: true, status: 'failed' }],
+      }),
+    };
+
+    expect(() => provisioner(environment, { routes, capabilityMaterializer }).instance.provision(input))
+      .toThrow(/required capability.*required-research/i);
+
+    expect(routes.get('oc_content_design')).toBe('/previous');
+    expect(existsSync(path.join(environment.organizationRoot, 'departments', 'content_design'))).toBe(false);
+    expect(json(path.join(environment.organizationRoot, 'company', 'department-registry.json')).departments).toEqual([]);
+    expect(json(path.join(environment.organizationRoot, 'router', 'group-router.json')).routes).toEqual([]);
   });
 });

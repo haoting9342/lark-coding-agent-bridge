@@ -6,12 +6,6 @@ function bulletList(values) {
   return (values ?? []).map((value) => `- ${value}`).join('\n') || '- 无';
 }
 
-function qualityCheckText(check) {
-  if (typeof check === 'string') return check;
-  if (!check || typeof check !== 'object') return String(check ?? '');
-  return `[${check.method}/${check.trigger}] ${check.description}`;
-}
-
 function orchestrationRules(policy) {
   return [
     '## 自适应代理编排',
@@ -32,25 +26,8 @@ import { workflowMaintenanceLines } from './department-overlay.mjs';
 
 export function renderDepartmentAgents(request, draft) {
   const protocols = (draft.taskProtocols ?? []).map((protocol) => [
-    `## ${protocol.name}（${protocol.id}）`,
-    '',
-    `用途：${protocol.purpose}`,
-    '',
-    `触发意图：${(protocol.intents ?? []).join('、')}`,
-    '',
-    `输入要求：${(protocol.requiredInputs ?? []).join('、') || '无固定输入'}`,
-    '',
-    `澄清规则：${protocol.clarificationPolicy}`,
-    '',
-    `步骤：${(protocol.steps ?? []).join(' → ')}`,
-    '',
-    `质量检查：${(protocol.qualityChecks ?? []).map(qualityCheckText).join('；')}`,
-    '',
-    `交付物：${(protocol.deliverables ?? []).join('、')}`,
-    '',
-    `完成标准：${(protocol.completionCriteria ?? []).join('；')}`,
-    '',
-    `修改规则：${protocol.revisionPolicy}`,
+    `- **${protocol.name}**（\`${protocol.id}\`）：${(protocol.intents ?? []).join('、') || protocol.purpose}`,
+    `  - 命中后读取：\`lark-channel-bridge-department organization workflow protocol ${request.departmentId} ${protocol.id}\``,
   ].join('\n')).join('\n\n');
   const multiHostRules = draft.organizationTopology?.nodes?.length > 1
     ? [
@@ -73,7 +50,11 @@ export function renderDepartmentAgents(request, draft) {
     '',
     '## 工作原则',
     '',
-    '- 先理解用户当前任务，再选择匹配的任务规程；不要把部门业务阶段机械套到每次任务上。',
+    '- 先理解用户当前任务，再判断执行模式；不要要求所有任务都命中规程。',
+    '- 直接执行：任务明确、风险低且不需要固定规程时，直接完成。',
+    '- 单规程：明确命中一个任务规程时，只按需读取该规程。',
+    '- 组合规程：确实跨越多个规程时，只读取命中的规程并说明组合顺序。',
+    '- 自由探索：新任务、目标不确定或现有规程不适用时，先探索和澄清，不得强行套用规程。',
     '- 缺少影响交付质量的关键信息时先澄清；能够安全推断的非关键细节可以提出候选方案。',
     '- 交付前执行对应质量检查；涉及审批边界时必须停下并取得明确授权。',
     '- 保留工作区既有规则，冲突时采用更严格的约束并向用户说明。',
@@ -93,7 +74,9 @@ export function renderDepartmentAgents(request, draft) {
     '',
     bulletList(draft.approvalBoundaries),
     '',
-    protocols || '## 默认任务规程\n\n理解任务 → 澄清关键输入 → 执行 → 质量检查 → 交付。',
+    '## 任务规程索引',
+    '',
+    protocols || '当前没有预定义任务规程；按直接执行或自由探索模式处理。',
     '',
     ...workflowMaintenanceLines({
       departmentId: request.departmentId,

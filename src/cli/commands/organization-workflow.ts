@@ -1,6 +1,4 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { resolveAppPaths } from '../../config/app-paths';
 import { ensureDefaultOrganization } from '../../organization/initializer';
 
@@ -23,9 +21,9 @@ async function readBoundedStdin(maxBytes = 512 * 1024): Promise<string> {
 }
 
 function workflowRuntimeEntry(): string {
-  const source = join(process.cwd(), 'department-runtime', 'department-workflow-updater.mjs');
-  if (existsSync(source)) return pathToFileURL(source).href;
-  return new URL('../department-runtime/department-workflow-updater.mjs', import.meta.url).href;
+  const packagedEntry = new URL('../department-runtime/department-workflow-updater.mjs', import.meta.url);
+  const sourceEntry = new URL('../../../department-runtime/department-workflow-updater.mjs', import.meta.url);
+  return existsSync(packagedEntry) ? packagedEntry.href : sourceEntry.href;
 }
 
 async function updaterFor(rootDir: string, options: WorkflowCommandOptions): Promise<any> {
@@ -42,6 +40,18 @@ export async function runOrganizationWorkflowShow(
   const rootDir = options.rootDir ?? resolveAppPaths().rootDir;
   const updater = await updaterFor(rootDir, options);
   const result = updater.show(departmentId);
+  (options.output ?? console.log)(JSON.stringify(result, null, 2));
+  return result;
+}
+
+export async function runOrganizationWorkflowProtocol(
+  departmentId: string,
+  protocolId: string,
+  options: WorkflowCommandOptions = {},
+): Promise<unknown> {
+  const rootDir = options.rootDir ?? resolveAppPaths().rootDir;
+  const updater = await updaterFor(rootDir, options);
+  const result = updater.protocol(departmentId, protocolId);
   (options.output ?? console.log)(JSON.stringify(result, null, 2));
   return result;
 }

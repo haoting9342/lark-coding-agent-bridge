@@ -1,15 +1,39 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mkdtemp } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import {
   runOrganizationWorkflowApply,
+  runOrganizationWorkflowProtocol,
   runOrganizationWorkflowShow,
 } from '../../../src/cli/commands/organization-workflow.js';
 import { ensureDefaultOrganization } from '../../../src/organization/initializer.js';
 
 describe('organization workflow CLI contract', () => {
+  it('does not load workflow code from the current working directory', async () => {
+    const source = await readFile(
+      join(process.cwd(), 'src', 'cli', 'commands', 'organization-workflow.ts'),
+      'utf8',
+    );
+
+    expect(source).not.toContain('process.cwd()');
+  });
+
+  it('prints only one requested protocol', async () => {
+    const output: string[] = [];
+    const result = await runOrganizationWorkflowProtocol('public_course', 'make_slides', {
+      rootDir: '/tmp/root',
+      createUpdater: () => ({
+        protocol: () => ({ departmentId: 'public_course', protocol: { id: 'make_slides' } }),
+      }),
+      output: (line) => output.push(line),
+    });
+
+    expect(result).toEqual({ departmentId: 'public_course', protocol: { id: 'make_slides' } });
+    expect(output.join('\n')).not.toContain('taskProtocols');
+  });
+
   it('shows the authoritative workflow metadata as JSON', async () => {
     const rootDir = await mkdtemp(join(tmpdir(), 'organization-workflow-cli-'));
     const initialized = await ensureDefaultOrganization({ rootDir });

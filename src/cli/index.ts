@@ -27,6 +27,7 @@ import { runUi } from './commands/ui';
 import { runOrganizationDoctor, runOrganizationStatus } from './commands/organization';
 import {
   runOrganizationWorkflowApply,
+  runOrganizationWorkflowProtocol,
   runOrganizationWorkflowShow,
 } from './commands/organization-workflow';
 import {
@@ -107,6 +108,13 @@ organizationWorkflow
   .description('Print the authoritative workflow, revision, and SHA-256')
   .action(async (departmentId: string) => {
     await runOrganizationWorkflowShow(departmentId);
+  });
+
+organizationWorkflow
+  .command('protocol <department-id> <protocol-id>')
+  .description('Print one task protocol without loading unrelated protocols')
+  .action(async (departmentId: string, protocolId: string) => {
+    await runOrganizationWorkflowProtocol(departmentId, protocolId);
   });
 
 organizationWorkflow

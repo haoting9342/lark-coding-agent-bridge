@@ -8,8 +8,8 @@ import {
 } from "node:fs";
 import path from "node:path";
 
-const DEFAULT_MAX_FILES = 200;
-const DEFAULT_MAX_FILE_BYTES = 25 * 1024 * 1024;
+const DEFAULT_MAX_FILES = 30;
+const DEFAULT_MAX_FILE_BYTES = 1024 * 1024;
 const RECOVERABLE_FILESYSTEM_ERRORS = new Set([
   'EACCES',
   'ELOOP',
@@ -110,6 +110,26 @@ function shouldInclude(relativePath) {
   );
 }
 
+function queryTerms(contextQuery) {
+  const values = [
+    contextQuery?.purpose,
+    ...(Array.isArray(contextQuery?.responsibilities) ? contextQuery.responsibilities : []),
+  ];
+  return [...new Set(values
+    .filter((value) => typeof value === "string")
+    .flatMap((value) => value.toLowerCase().match(/[\p{L}\p{N}_-]{2,}/gu) ?? []))];
+}
+
+function relevance(candidate, terms) {
+  const name = candidate.relativePath.toLowerCase();
+  let score = path.basename(name) === "agents.md" ? 100 : 0;
+  if (/readme|memory|workflow|brief|requirements?|spec/.test(name)) score += 10;
+  for (const term of terms) {
+    if (name.includes(term)) score += 20;
+  }
+  return score;
+}
+
 function isRecoverableFileSystemError(error) {
   return RECOVERABLE_FILESYSTEM_ERRORS.has(error?.code);
 }
@@ -184,6 +204,7 @@ export function inventoryDepartmentContext({
   maxFiles = DEFAULT_MAX_FILES,
   maxFileBytes = DEFAULT_MAX_FILE_BYTES,
   maxAncestors = 4,
+  contextQuery = {},
   fileSystem: fileSystemOverrides = {},
 } = {}) {
   if (typeof workspace !== "string" || !path.isAbsolute(workspace)) {
@@ -193,6 +214,7 @@ export function inventoryDepartmentContext({
     throw new TypeError("maxFiles must be a positive integer");
   }
   const fileSystem = { ...DEFAULT_FILE_SYSTEM, ...fileSystemOverrides };
+  const requestedWorkspace = path.resolve(workspace);
   const canonicalWorkspace = fileSystem.realpathSync(workspace);
   if (!fileSystem.statSync(canonicalWorkspace).isDirectory()) {
     throw new TypeError("workspace must be a directory");
@@ -201,7 +223,11 @@ export function inventoryDepartmentContext({
   const candidates = [];
   walkWorkspace(canonicalWorkspace, canonicalWorkspace, candidates, fileSystem);
   parentAgentCandidates(canonicalWorkspace, candidates, maxAncestors, fileSystem);
-  candidates.sort((left, right) => left.relativePath.localeCompare(right.relativePath, "en"));
+  const terms = queryTerms(contextQuery);
+  candidates.sort((left, right) => (
+    relevance(right, terms) - relevance(left, terms)
+    || left.relativePath.localeCompare(right.relativePath, "en")
+  ));
 
   const sources = [];
   for (const candidate of candidates) {
@@ -216,6 +242,13 @@ export function inventoryDepartmentContext({
   }
   return {
     workspace: canonicalWorkspace,
+    requestedWorkspace,
+    contextQuery: {
+      purpose: typeof contextQuery?.purpose === "string" ? contextQuery.purpose : "",
+      responsibilities: Array.isArray(contextQuery?.responsibilities)
+        ? contextQuery.responsibilities.filter((value) => typeof value === "string")
+        : [],
+    },
     repository: {
       present: (() => {
         try {

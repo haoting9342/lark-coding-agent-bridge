@@ -43,4 +43,35 @@ describe('department context inventory resilience', () => {
       },
     })).toThrow(/unexpected storage failure/);
   });
+
+  it('prioritizes files matching the confirmed department theme', () => {
+    const workspace = mkdtempSync(path.join(tmpdir(), 'department-context-targeted-'));
+    writeFileSync(path.join(workspace, 'accounting.md'), 'unrelated\n');
+    writeFileSync(path.join(workspace, 'script-plan.md'), 'relevant\n');
+
+    const result = inventoryDepartmentContext({
+      workspace,
+      maxFiles: 1,
+      contextQuery: {
+        purpose: 'script creation',
+        responsibilities: ['script writing'],
+      },
+    });
+
+    expect(result.requestedWorkspace).toBe(path.resolve(workspace));
+    expect(result.contextQuery).toEqual({
+      purpose: 'script creation',
+      responsibilities: ['script writing'],
+    });
+    expect(result.sources.map((source) => source.relativePath)).toEqual(['script-plan.md']);
+  });
+
+  it('does not read files larger than one MiB by default', () => {
+    const workspace = mkdtempSync(path.join(tmpdir(), 'department-context-bounded-'));
+    writeFileSync(path.join(workspace, 'large-plan.md'), Buffer.alloc(1024 * 1024 + 1, 1));
+
+    const result = inventoryDepartmentContext({ workspace });
+
+    expect(result.sources).toEqual([]);
+  });
 });

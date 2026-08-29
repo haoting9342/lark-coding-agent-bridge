@@ -78,9 +78,14 @@ const TASK_PROTOCOL_FIELDS = new Set([
   "deliverables",
   "completionCriteria",
   "skills",
+  "contextPolicy",
+  "skillPolicy",
   "revisionPolicy",
   "executionPolicy",
 ]);
+const CONTEXT_POLICY_FIELDS = new Set(["mode", "include", "exclude", "maxFiles", "maxFileBytes"]);
+const SKILL_POLICY_FIELDS = new Set(["primary", "auxiliaries", "maxAuxiliaries"]);
+const AUXILIARY_SKILL_FIELDS = new Set(["skill", "when"]);
 const QUALITY_CHECK_FIELDS = new Set(["id", "description", "method", "trigger"]);
 const QUALITY_CHECK_METHODS = new Set(["deterministic", "coordinator", "independent", "human"]);
 const QUALITY_CHECK_TRIGGERS = new Set(["always", "on_failure", "risk_based", "before_external_action"]);
@@ -231,6 +236,36 @@ function normalizeTaskProtocols(value) {
     }
     if ("qualityChecks" in normalized) {
       normalized.qualityChecks = normalizeQualityChecks(normalized.qualityChecks);
+    }
+    normalized.contextPolicy ??= {
+      mode: "targeted",
+      include: ["当前用户请求", "已确认部门事实", "命中规程所需输入"],
+      exclude: ["无关工作区文件", "敏感信息"],
+      maxFiles: 20,
+      maxFileBytes: 1024 * 1024,
+    };
+    if (normalized.contextPolicy && typeof normalized.contextPolicy === "object") {
+      normalized.contextPolicy.mode = normalizeText(normalized.contextPolicy.mode);
+      normalized.contextPolicy.include = normalizeStringArray(normalized.contextPolicy.include);
+      normalized.contextPolicy.exclude = normalizeStringArray(normalized.contextPolicy.exclude);
+    }
+    normalized.skillPolicy ??= {
+      primary: normalized.skills?.[0] ?? null,
+      auxiliaries: (normalized.skills ?? []).slice(1, 3).map((skill) => ({
+        skill,
+        when: "任务明确需要该能力时",
+      })),
+      maxAuxiliaries: 2,
+    };
+    if (normalized.skillPolicy && typeof normalized.skillPolicy === "object") {
+      normalized.skillPolicy.primary = normalizeText(normalized.skillPolicy.primary);
+      if (Array.isArray(normalized.skillPolicy.auxiliaries)) {
+        normalized.skillPolicy.auxiliaries = normalized.skillPolicy.auxiliaries.map((item) => ({
+          ...structuredClone(item),
+          skill: normalizeText(item?.skill),
+          when: normalizeText(item?.when),
+        }));
+      }
     }
     if (normalized.executionPolicy && typeof normalized.executionPolicy === "object") {
       const policy = normalized.executionPolicy;
@@ -624,14 +659,6 @@ function validateTaskProtocols(value, errors, requireReady) {
     addError(errors, "/taskProtocols", "INVALID_ARRAY", "taskProtocols must be an array");
     return;
   }
-  if (requireReady && value.length === 0) {
-    addError(
-      errors,
-      "/taskProtocols",
-      "CORE_TASK_PROTOCOL_REQUIRED",
-      "at least one core task protocol is required before final confirmation",
-    );
-  }
   const ids = new Set();
   for (const [index, protocol] of value.entries()) {
     const base = `/taskProtocols/${index}`;
@@ -677,6 +704,61 @@ function validateTaskProtocols(value, errors, requireReady) {
       requireStringArray(protocol[field] ?? [], `${base.slice(1)}/${field}`, errors, {
         allowEmpty: true,
       });
+    }
+    const contextPolicy = protocol.contextPolicy;
+    if (!contextPolicy || typeof contextPolicy !== "object" || Array.isArray(contextPolicy)) {
+      addError(errors, `${base}/contextPolicy`, "INVALID_CONTEXT_POLICY", "contextPolicy must be an object");
+    } else {
+      for (const field of Object.keys(contextPolicy)) {
+        if (!CONTEXT_POLICY_FIELDS.has(field)) {
+          addError(errors, `${base}/contextPolicy/${field}`, "UNKNOWN_FIELD", `unknown context policy field: ${field}`);
+        }
+      }
+      if (contextPolicy.mode !== "targeted") {
+        addError(errors, `${base}/contextPolicy/mode`, "INVALID_CONTEXT_POLICY", "context policy mode must be targeted");
+      }
+      requireStringArray(contextPolicy.include, `${base.slice(1)}/contextPolicy/include`, errors, { allowEmpty: true });
+      requireStringArray(contextPolicy.exclude, `${base.slice(1)}/contextPolicy/exclude`, errors, { allowEmpty: true });
+      if (!Number.isInteger(contextPolicy.maxFiles) || contextPolicy.maxFiles < 1 || contextPolicy.maxFiles > 100) {
+        addError(errors, `${base}/contextPolicy/maxFiles`, "INVALID_CONTEXT_POLICY", "maxFiles must be between 1 and 100");
+      }
+      if (!Number.isInteger(contextPolicy.maxFileBytes) || contextPolicy.maxFileBytes < 1 || contextPolicy.maxFileBytes > 5 * 1024 * 1024) {
+        addError(errors, `${base}/contextPolicy/maxFileBytes`, "INVALID_CONTEXT_POLICY", "maxFileBytes must be at most 5 MiB");
+      }
+    }
+    const skillPolicy = protocol.skillPolicy;
+    if (!skillPolicy || typeof skillPolicy !== "object" || Array.isArray(skillPolicy)) {
+      addError(errors, `${base}/skillPolicy`, "INVALID_SKILL_POLICY", "skillPolicy must be an object");
+    } else {
+      for (const field of Object.keys(skillPolicy)) {
+        if (!SKILL_POLICY_FIELDS.has(field)) {
+          addError(errors, `${base}/skillPolicy/${field}`, "UNKNOWN_FIELD", `unknown skill policy field: ${field}`);
+        }
+      }
+      if (skillPolicy.primary !== null && (typeof skillPolicy.primary !== "string" || !skillPolicy.primary)) {
+        addError(errors, `${base}/skillPolicy/primary`, "INVALID_SKILL_POLICY", "primary must be a skill id or null");
+      }
+      if (!Array.isArray(skillPolicy.auxiliaries)) {
+        addError(errors, `${base}/skillPolicy/auxiliaries`, "INVALID_SKILL_POLICY", "auxiliaries must be an array");
+      } else {
+        for (const [auxiliaryIndex, auxiliary] of skillPolicy.auxiliaries.entries()) {
+          const auxiliaryBase = `${base}/skillPolicy/auxiliaries/${auxiliaryIndex}`;
+          if (!auxiliary || typeof auxiliary !== "object" || Array.isArray(auxiliary)) {
+            addError(errors, auxiliaryBase, "INVALID_SKILL_POLICY", "auxiliary skill must be an object");
+            continue;
+          }
+          for (const field of Object.keys(auxiliary)) {
+            if (!AUXILIARY_SKILL_FIELDS.has(field)) addError(errors, `${auxiliaryBase}/${field}`, "UNKNOWN_FIELD", `unknown auxiliary skill field: ${field}`);
+          }
+          requireText(auxiliary.skill, `${auxiliaryBase.slice(1)}/skill`, errors);
+          requireText(auxiliary.when, `${auxiliaryBase.slice(1)}/when`, errors);
+        }
+      }
+      if (!Number.isInteger(skillPolicy.maxAuxiliaries) || skillPolicy.maxAuxiliaries < 0 || skillPolicy.maxAuxiliaries > 4) {
+        addError(errors, `${base}/skillPolicy/maxAuxiliaries`, "INVALID_SKILL_POLICY", "maxAuxiliaries must be between 0 and 4");
+      } else if (Array.isArray(skillPolicy.auxiliaries) && skillPolicy.auxiliaries.length > skillPolicy.maxAuxiliaries) {
+        addError(errors, `${base}/skillPolicy/auxiliaries`, "INVALID_SKILL_POLICY", "auxiliaries exceed maxAuxiliaries");
+      }
     }
   }
 }

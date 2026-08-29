@@ -7,12 +7,6 @@ function lines(values) {
   return (values ?? []).map((value) => `- ${value}`).join('\n') || '- 无';
 }
 
-function qualityCheckText(check) {
-  if (typeof check === 'string') return check;
-  if (!check || typeof check !== 'object') return String(check ?? '');
-  return `[${check.method}/${check.trigger}] ${check.description}`;
-}
-
 function orchestrationLines(policy) {
   return [
     '### 自适应代理编排',
@@ -34,6 +28,7 @@ export function workflowMaintenanceLines({ departmentId, workflowPath }) {
     '### 部门流程维护',
     `- 权威工作流文件：\`${workflowPath}\`。不要依赖工作区内同名文件，也不要自行猜测控制面路径。`,
     `- 先使用 \`lark-channel-bridge-department organization workflow show ${departmentId}\` 读取当前版本、SHA-256 和 apply 请求模板。`,
+    `- 执行任务时不要读取完整工作流；只使用 \`lark-channel-bridge-department organization workflow protocol ${departmentId} <规程编号>\` 提取命中的单个规程。`,
     '- 用户说“这次”“当前这份”或“先这样做”时，只影响当前任务，不修改部门长期流程。',
     '- 用户明确说“以后”“默认”“今后都按”或要求修改部门 workflow 时，结合已接受产物提出完整规程差异，允许逐项讨论和修改。',
     '- 正式写入前必须展示影响范围，并取得“确认修改部门流程”或“同意修改部门流程”这类 workflow 专项授权；普通“好的”“可以”“同意”不足以授权写入。',
@@ -43,17 +38,20 @@ export function workflowMaintenanceLines({ departmentId, workflowPath }) {
 
 export function renderDepartmentOverlay({ departmentId, departmentName, draft, workflowPath }) {
   const protocols = (draft.taskProtocols ?? []).map((protocol) => [
-    `### ${protocol.name}（${protocol.id}）`,
-    `触发意图：${(protocol.intents ?? []).join('、') || '按名称匹配'}`,
-    `执行步骤：${(protocol.steps ?? []).join(' → ')}`,
-    `质量检查：${(protocol.qualityChecks ?? []).map(qualityCheckText).join('；')}`,
-    `完成标准：${(protocol.completionCriteria ?? []).join('；')}`,
+    `- **${protocol.name}**（\`${protocol.id}\`）：${(protocol.intents ?? []).join('、') || protocol.purpose}`,
+    `  - 命中后读取：\`lark-channel-bridge-department organization workflow protocol ${departmentId} ${protocol.id}\``,
   ].join('\n')).join('\n\n');
   return [
     markerStart(departmentId),
     `## 部门工作规则：${departmentName}`,
     '',
     `部门类型：${draft.kind}。目标：${draft.purpose}`,
+    '',
+    '### 任务模式',
+    '- 直接执行：明确、低风险且无需固定规程的任务直接完成。',
+    '- 单规程：只读取唯一命中的规程。',
+    '- 组合规程：只读取确实命中的多个规程，并说明组合顺序。',
+    '- 自由探索：新任务或不确定任务先探索，不强制命中规程。',
     '',
     '### 职责',
     lines(draft.responsibilities),
@@ -63,8 +61,8 @@ export function renderDepartmentOverlay({ departmentId, departmentName, draft, w
     '',
     ...orchestrationLines(draft.orchestrationPolicy),
     '',
-    '### 任务执行规程',
-    protocols || '按用户具体任务先澄清、再执行、检查并交付。',
+    '### 任务规程索引',
+    protocols || '当前没有预定义任务规程。',
     '',
     ...workflowMaintenanceLines({ departmentId, workflowPath }),
     '',

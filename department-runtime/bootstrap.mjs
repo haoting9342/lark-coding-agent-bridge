@@ -31,6 +31,18 @@ function loadCapabilityCatalog(organizationRoot) {
   return document.capabilities;
 }
 
+export function resolveAgentSkillsRoot({ agentKind, profileRoot, codex = {} }) {
+  if (agentKind === 'codex') {
+    const codexRoot = codex.codexHome
+      ? path.resolve(codex.codexHome)
+      : codex.ignoreUserConfig === true
+        ? path.join(path.resolve(profileRoot), 'codex-home')
+        : path.resolve(process.env.CODEX_HOME ?? path.join(homedir(), '.codex'));
+    return path.join(codexRoot, 'skills');
+  }
+  return path.join(homedir(), '.claude', 'skills');
+}
+
 export async function getDepartmentRuntime(bridgeContext) {
   const organizationRoot = requiredAbsolute(bridgeContext, 'organizationRoot');
   const profileRoot = requiredAbsolute(bridgeContext, 'profileRoot');
@@ -41,8 +53,11 @@ export async function getDepartmentRuntime(bridgeContext) {
   const storeFile = path.join(profileRoot, 'departments', 'design-sessions.json');
   const designStore = new DepartmentDesignStore(storeFile);
   const capabilityCatalog = loadCapabilityCatalog(organizationRoot);
-  const codexRoot = path.resolve(process.env.CODEX_HOME ?? path.join(homedir(), '.codex'));
-  const hostSkillsRoot = path.join(codexRoot, 'skills');
+  const hostSkillsRoot = resolveAgentSkillsRoot({
+    agentKind: bridgeContext.agentKind,
+    profileRoot,
+    codex: bridgeContext.codex,
+  });
   const capabilityMaterializer = new DepartmentCapabilityMaterializer({
     hostSkillsRoot,
     skillRoots: [hostSkillsRoot],
@@ -68,6 +83,7 @@ export async function getDepartmentRuntime(bridgeContext) {
     inventoryContext: (context) => inventoryDepartmentContext({
       workspace: context.currentWorkspace,
       capabilityCatalog,
+      contextQuery: context.contextQuery,
     }),
     draftCli: path.join(MODULE_ROOT, 'department-draft-cli.mjs'),
     storeFile,

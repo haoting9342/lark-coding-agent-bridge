@@ -6,7 +6,7 @@ describe('README runtime contract', () => {
     const docs = await readDocs();
 
     for (const phrase of [
-      'per-profile service',
+      '独立后台服务',
       'workspaces.default',
       '/invite user',
       '/remove user',
@@ -19,8 +19,6 @@ describe('README runtime contract', () => {
       'profile remove',
       '--purge --yes',
       '--include-secrets --yes',
-      'lark-cli identity policy',
-      'profile-local lark-cli directory',
       'lark-cli 身份策略',
       '当前 profile 的 lark-cli 目录',
       'pnpm test',
@@ -74,7 +72,6 @@ describe('README runtime contract', () => {
   it('documents cloud-doc comments as document-scoped instead of access-gated', async () => {
     const docs = await readDocs();
 
-    expect(docs).toContain('Cloud-doc comments are document-scoped');
     expect(docs).toContain('云文档评论按文档权限生效');
     expect(docs).not.toContain('comments.enabled');
     expect(docs).not.toContain('comments.rateLimit');
@@ -87,7 +84,6 @@ describe('README runtime contract', () => {
     expect(docs).toContain('"permissions"');
     expect(docs).toContain('"defaultAccess": "full"');
     expect(docs).toContain('"maxAccess": "full"');
-    expect(docs).toContain('legacy `sandbox`');
     expect(docs).toContain('旧版 `sandbox`');
     expect(docs).not.toContain('"sandbox"');
   });

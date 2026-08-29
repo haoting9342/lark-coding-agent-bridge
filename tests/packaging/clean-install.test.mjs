@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 function walk(directory) {
@@ -12,7 +13,7 @@ function walk(directory) {
 }
 
 describe('clean npm install contract', () => {
-  it('packs, installs, and initializes only the isolated department product', () => {
+  it('packs, installs, initializes, and provisions a department with the installed runtime', async () => {
     const corepack = process.platform === 'win32' ? 'corepack.cmd' : 'corepack';
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     const root = mkdtempSync(path.join(tmpdir(), 'department-package-'));
@@ -62,7 +63,7 @@ describe('clean npm install contract', () => {
       encoding: 'utf8',
       timeout: 30_000,
     }).trim();
-    expect(version).toBe('0.7.0');
+    expect(version).toBe('0.7.1');
     const status = execFileSync(process.execPath, [cli, 'organization', 'status'], {
       cwd: temporaryHome,
       env,
@@ -72,6 +73,34 @@ describe('clean npm install contract', () => {
     expect(status).toContain('status: ready');
     expect(existsSync(path.join(stateRoot, 'organizations', 'default', 'organization.json'))).toBe(true);
     expect(existsSync(path.join(temporaryHome, '.lark-channel'))).toBe(false);
+
+    const organizationRoot = path.join(stateRoot, 'organizations', 'default');
+    const profileRoot = path.join(stateRoot, 'profiles', 'default');
+    const workspace = path.join(temporaryHome, 'content-workspace');
+    mkdirSync(profileRoot, { recursive: true });
+    mkdirSync(workspace, { recursive: true });
+    writeFileSync(path.join(workspace, 'AGENTS.md'), '# 原有工作区规则\n');
+    const { DepartmentProvisioner } = await import(pathToFileURL(
+      path.join(packageRoot, 'department-runtime', 'department-provisioner.mjs'),
+    ).href);
+    const draft = {
+      departmentName: '内容部', kind: 'permanent', purpose: '持续制作内容', workspace,
+      responsibilities: ['选题', '写作'], outOfScope: ['未经确认的发布'],
+      workflow: ['理解任务', '执行', '验证', '交付'], businessLifecycle: [], taskProtocols: [],
+      capabilityPlan: [], approvalBoundaries: ['对外发布'], confirmedFacts: [], historicalRules: [],
+      contextSources: [], openQuestions: [], mission: '持续提供内容服务', serviceCatalog: ['内容制作'],
+      recurringWorkflows: [], defaultProjects: [], taskTypes: ['内容任务'],
+    };
+    const provisioned = new DepartmentProvisioner({ organizationRoot, profileRoot }).provision({
+      departmentId: 'content', departmentName: '内容部', groupName: '内容群',
+      chatId: 'oc_clean_install', senderId: 'ou_owner', host: 'local', profile: 'default',
+      workspace, responsibilities: draft.responsibilities,
+      approvalBoundaries: draft.approvalBoundaries, draft,
+      contextInventory: { workspace, sources: [] },
+    });
+    expect(provisioned.status).toBe('completed');
+    expect(existsSync(path.join(organizationRoot, 'departments', 'content', 'workflow.json'))).toBe(true);
+    expect(readFileSync(path.join(workspace, 'AGENTS.md'), 'utf8')).toContain('自由探索');
 
     const forbidden = /OPC_DEPARTMENT_RUNTIME_ENTRY|OPC_DEPARTMENT_CONTROLLER_CONFIG|opc-company|\/Users\/crystal|\/home\/hao/i;
     const legacyExecutable = /\blark-channel-bridge(?!-department)\s+(?:run|start|stop|restart|status|ui|ps|kill|secrets)\b/i;

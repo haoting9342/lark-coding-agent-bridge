@@ -40,6 +40,15 @@ function permanentDraft() {
 }
 
 describe('department draft schema', () => {
+  it('allows a ready department with no predefined task protocol', () => {
+    const draft = permanentDraft();
+    draft.taskProtocols = [];
+
+    const result = validateDepartmentDraft(draft, { requireReady: true });
+
+    expect(result.ok).toBe(true);
+  });
+
   it('synthesizes a safe single-host topology and keeps task protocols separate', () => {
     const result = validateDepartmentDraft(permanentDraft(), { requireReady: true });
 
@@ -108,6 +117,28 @@ describe('department draft schema', () => {
         trigger: 'before_external_action',
       },
     ]);
+  });
+
+  it('derives targeted context and one-primary-skill policies from existing protocols', () => {
+    const draft = permanentDraft();
+    draft.taskProtocols[0].skills = ['outline-writing', 'web-research', 'copy-editing'];
+
+    const result = validateDepartmentDraft(draft, { requireReady: true });
+
+    expect(result.ok).toBe(true);
+    expect(result.value.taskProtocols[0].contextPolicy).toMatchObject({
+      mode: 'targeted',
+      maxFiles: 20,
+      maxFileBytes: 1024 * 1024,
+    });
+    expect(result.value.taskProtocols[0].skillPolicy).toEqual({
+      primary: 'outline-writing',
+      auxiliaries: [
+        { skill: 'web-research', when: '任务明确需要该能力时' },
+        { skill: 'copy-editing', when: '任务明确需要该能力时' },
+      ],
+      maxAuxiliaries: 2,
+    });
   });
 
   it('rejects unsafe or unknown adaptive orchestration settings', () => {

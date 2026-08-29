@@ -3,17 +3,15 @@ import { log } from '../core/logger';
 import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { pathToFileURL } from 'node:url';
 import { resolveMappedDepartmentWorkspace } from '../../department-runtime/department-workspace.mjs';
 
 let departmentBootstrapPromise: Promise<any> | undefined;
 
 async function loadDepartmentBootstrap(): Promise<any> {
   try {
-    const sourceEntry = join(process.cwd(), 'department-runtime', 'bootstrap.mjs');
-    const entry = existsSync(sourceEntry)
-      ? pathToFileURL(sourceEntry).href
-      : new URL('../department-runtime/bootstrap.mjs', import.meta.url).href;
+    const packagedEntry = new URL('../department-runtime/bootstrap.mjs', import.meta.url);
+    const sourceEntry = new URL('../../department-runtime/bootstrap.mjs', import.meta.url);
+    const entry = existsSync(packagedEntry) ? packagedEntry.href : sourceEntry.href;
     departmentBootstrapPromise ??= import(entry);
     return await departmentBootstrapPromise;
   } catch (error) {
@@ -84,6 +82,8 @@ function bridgeContext(context: any): Record<string, unknown> {
       context.controls.profileConfig.organizationId ?? 'default',
     ),
     profileRoot: join(dirname(context.controls.configPath), 'profiles', context.controls.profile),
+    agentKind: context.controls.profileConfig.agentKind,
+    codex: context.controls.profileConfig.codex,
     activeRunCount: () => context.activeRuns.scopes().length,
     currentWorkspaceRoute: (chatId: string) => context.workspaces.cwdFor(chatId),
     applyWorkspaceRoute: (route: { chatId: string; cwd: string }) =>

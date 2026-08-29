@@ -75,36 +75,116 @@ describe('exclusive conversational department design', () => {
     expect(designStore.getFor(context).status).toBe('active');
   });
 
-  it('requires an explicit group workspace before starting design', () => {
+  it('starts without /cd and does not scan before name, workspace, and theme are known', () => {
     let inventoryCalls = 0;
     const { runtime, designStore, context, replies } = setup({
       currentWorkspace: null,
       inventoryContext: () => {
         inventoryCalls += 1;
-        throw new Error('must not scan a profile default');
+        throw new Error('must not scan before the theme is known');
       },
     });
 
     runtime.handleDepartmentCommand('create 测试部', context);
 
     expect(inventoryCalls).toBe(0);
-    expect(designStore.getFor(context)).toBeNull();
-    expect(replies.at(-1)).toMatch(/workspace|工作区/i);
-    expect(replies.at(-1)).toContain('/cd');
+    expect(designStore.getFor(context).draft.departmentName).toBe('测试部');
+    expect(designStore.getFor(context).contextInventory).toBeNull();
+    expect(replies.at(-1)).toMatch(/工作路径/);
+    expect(replies.at(-1)).not.toContain('/cd');
   });
 
-  it('replies when inventory fails and does not leave a design session', () => {
+  it('scans the selected workspace only after purpose and responsibilities are known', () => {
+    const inventoryCalls = [];
     const { runtime, designStore, context, replies } = setup({
-      inventoryContext: () => {
-        throw new Error('inventory exploded');
+      currentWorkspace: null,
+      inventoryContext: (request) => {
+        inventoryCalls.push(request);
+        return { workspace: request.currentWorkspace, sources: [] };
       },
     });
 
-    runtime.handleDepartmentCommand('create 测试部', context);
+    const selectedWorkspace = path.join(tmpdir(), 'department-target');
+    runtime.handleDepartmentCommand(`create 内容部 --workspace ${selectedWorkspace}`, context);
+    const started = designStore.getFor(context);
+    designStore.update(started.key, {
+      draft: {
+        ...started.draft,
+        purpose: '持续制作自媒体内容',
+        responsibilities: ['选题研究', '脚本撰写'],
+      },
+    }, {
+      actorId: context.senderId,
+      source: 'user_explicit',
+      reason: 'theme confirmed',
+      changedPaths: ['/draft/purpose', '/draft/responsibilities'],
+    });
 
-    expect(designStore.getFor(context)).toBeNull();
-    expect(replies.at(-1)).toMatch(/未启动|读取失败/);
-    expect(replies.at(-1)).toMatch(/重试|\/department create/);
+    context.text = '接着完善部门规则';
+    const result = runtime.intakeDepartmentMessage(context);
+
+    expect(result.action).toBe('design');
+    expect(inventoryCalls).toHaveLength(1);
+    expect(inventoryCalls[0]).toMatchObject({
+      currentWorkspace: selectedWorkspace,
+      contextQuery: {
+        purpose: '持续制作自媒体内容',
+        responsibilities: ['选题研究', '脚本撰写'],
+      },
+    });
+    expect(designStore.getFor(context).contextInventory).toMatchObject({ sources: [] });
+    expect(replies).toEqual([expect.stringMatching(/工作路径/)]);
+  });
+
+  it('rescans when the confirmed department theme changes', () => {
+    const inventoryCalls = [];
+    const { runtime, designStore, context } = setup({
+      inventoryContext: (request) => {
+        inventoryCalls.push(request.contextQuery);
+        return {
+          workspace: request.currentWorkspace,
+          requestedWorkspace: request.currentWorkspace,
+          contextQuery: structuredClone(request.contextQuery),
+          sources: [],
+        };
+      },
+    });
+    runtime.handleDepartmentCommand(`create 内容部 --workspace ${context.currentWorkspace}`, context);
+    const started = designStore.getFor(context);
+    designStore.update(started.key, {
+      draft: { ...started.draft, purpose: '制作短视频', responsibilities: ['脚本'] },
+    });
+
+    context.text = '继续';
+    runtime.intakeDepartmentMessage(context);
+    const scanned = designStore.getFor(context);
+    designStore.update(scanned.key, {
+      draft: { ...scanned.draft, purpose: '制作播客', responsibilities: ['访谈'] },
+    });
+    runtime.intakeDepartmentMessage(context);
+
+    expect(inventoryCalls).toEqual([
+      { purpose: '制作短视频', responsibilities: ['脚本'] },
+      { purpose: '制作播客', responsibilities: ['访谈'] },
+    ]);
+  });
+
+  it('passes a targeted scan failure to the design agent for correction', () => {
+    const { runtime, designStore, context } = setup({
+      inventoryContext: () => { throw new Error('workspace is unavailable'); },
+    });
+    runtime.handleDepartmentCommand(`create 内容部 --workspace ${context.currentWorkspace}`, context);
+    const started = designStore.getFor(context);
+    designStore.update(started.key, {
+      draft: { ...started.draft, purpose: '制作内容', responsibilities: ['写作'] },
+    });
+
+    context.text = '继续';
+    const result = runtime.intakeDepartmentMessage(context);
+
+    expect(result.action).toBe('design');
+    expect(result.prompt).toContain('workspace is unavailable');
+    expect(result.prompt).toContain('盘点失败');
   });
 
   it('passes agreement replies through after department creation is completed', () => {
@@ -138,6 +218,7 @@ describe('exclusive conversational department design', () => {
     expect(source).not.toContain('OPC_DEPARTMENT_RUNTIME_ENTRY');
     expect(source).not.toContain('OPC_DEPARTMENT_CONTROLLER_CONFIG');
     expect(source).toContain('department-runtime/bootstrap.mjs');
+    expect(source).not.toContain('process.cwd()');
     expect(source).toContain('resolveMappedDepartmentWorkspace');
     expect(source).not.toContain('profileConfig.workspaces.default');
   });

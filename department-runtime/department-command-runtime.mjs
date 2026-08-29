@@ -3,6 +3,7 @@ import { buildDepartmentDesignPrompt } from "./department-design-prompt.mjs";
 import { DepartmentDesignStoreError } from "./department-design-store.mjs";
 import { assertDepartmentDraft } from "./department-draft-schema.mjs";
 import { deriveDepartmentId } from "./department-id.mjs";
+import path from "node:path";
 
 const DEPARTMENT_COMMAND = /^\/department(?:\s|$)/i;
 const NATURAL_PAUSE = new Set(["暂停创建部门", "暂停部门创建"]);
@@ -28,6 +29,42 @@ function metadata(context) {
 
 function isGroup(context) {
   return context.chatType === "group" || context.chatType === "group_chat";
+}
+
+function parseCreateArguments(parts) {
+  const nameParts = [];
+  let workspace = null;
+  for (let index = 0; index < parts.length; index += 1) {
+    if (parts[index] === "--workspace") {
+      workspace = parts[index + 1] ?? null;
+      index += 1;
+    } else {
+      nameParts.push(parts[index]);
+    }
+  }
+  return { name: nameParts.join(" ").trim(), workspace };
+}
+
+function hasConfirmedTheme(draft) {
+  return typeof draft?.purpose === "string"
+    && draft.purpose.trim().length > 0
+    && Array.isArray(draft.responsibilities)
+    && draft.responsibilities.length > 0;
+}
+
+function contextQueryForDraft(draft) {
+  return {
+    purpose: draft.purpose,
+    responsibilities: [...draft.responsibilities],
+  };
+}
+
+function inventoryMatchesDraft(inventory, draft) {
+  if (!inventory || typeof draft?.workspace !== "string" || !hasConfirmedTheme(draft)) return false;
+  const inventoryWorkspace = inventory.requestedWorkspace ?? inventory.workspace;
+  if (typeof inventoryWorkspace !== "string"
+    || path.resolve(inventoryWorkspace) !== path.resolve(draft.workspace)) return false;
+  return JSON.stringify(inventory.contextQuery ?? null) === JSON.stringify(contextQueryForDraft(draft));
 }
 
 function summary(state) {
@@ -101,7 +138,8 @@ export class DepartmentCommandRuntime {
     }
     const commandParts = String(args ?? "").trim().split(/\s+/).filter(Boolean);
     const subcommand = commandParts[0]?.toLowerCase() || "help";
-    const createName = commandParts.slice(1).join(" ").trim();
+    const create = parseCreateArguments(commandParts.slice(1));
+    const createName = create.name;
     const state = this.designStore.getFor(context);
 
     if (["create", "status", "pause", "resume", "cancel"].includes(subcommand) && !isGroup(context)) {
@@ -114,42 +152,28 @@ export class DepartmentCommandRuntime {
         safeReply(context, `${summary(state)}\n当前群已有部门创建记录；请继续、暂停或查看状态。`);
         return true;
       }
-      if (!context.currentWorkspace) {
-        safeReply(
-          context,
-          "当前群尚未明确绑定 workspace，部门创建未启动，也不会扫描 profile 默认目录。请先用 /cd <工作区绝对路径> 定位并确认当前群工作区，再重试 /department create [部门名称]。",
-        );
-        return true;
-      }
-      let contextInventory;
-      try {
-        contextInventory = this.inventoryContext(context);
-      } catch (error) {
-        this.log({
-          event: "department_context_inventory_failed",
-          chatId: context.chatId,
-          error: error?.message ?? String(error),
-        });
-        safeReply(
-          context,
-          "部门创建未启动：已绑定 workspace 的上下文读取失败，且没有留下创建草案。请检查工作区是否存在且可访问，然后重试 /department create [部门名称]。",
-        );
-        return true;
-      }
       try {
         const started = this.designStore.start({
           ...metadata(context),
-          contextInventory,
+          currentWorkspace: create.workspace ?? context.currentWorkspace ?? null,
+          contextInventory: null,
         });
-        if (createName) {
+        if (createName || create.workspace) {
           this.designStore.update(started.key, {
             phase: "designing",
-            draft: { departmentName: createName },
+            draft: {
+              ...(createName ? { departmentName: createName } : {}),
+              ...(create.workspace ? { workspace: create.workspace } : {}),
+            },
           }, {
             actorId: context.senderId,
             source: "user_explicit",
-            reason: "department name supplied in create command",
-            changedPaths: ["/draft/departmentName", "/phase"],
+            reason: "department identity supplied in create command",
+            changedPaths: [
+              ...(createName ? ["/draft/departmentName"] : []),
+              ...(create.workspace ? ["/draft/workspace"] : []),
+              "/phase",
+            ],
           });
         }
       } catch (error) {
@@ -161,9 +185,9 @@ export class DepartmentCommandRuntime {
       }
       safeReply(
         context,
-        createName
-          ? `已进入部门创建独占模式，并记录部门名称“${createName}”。其余职责、边界和流程将结合历史上下文给出候选方案供你讨论确认。`
-          : "已进入部门创建独占模式。请先告诉我你确定的部门名称；其余职责、边界和流程将结合历史上下文给出候选方案供你讨论确认。",
+        createName && create.workspace
+          ? `已记录部门名称“${createName}”和工作路径。请先说明部门的大致主题、目标和主要工作；确认后才会针对性扫描工作区。`
+          : "已进入部门创建模式。请先提供部门名称和工作路径，再说明部门的大致主题、目标和主要工作；确认前不会扫描工作区。",
       );
       return true;
     }
@@ -300,6 +324,33 @@ export class DepartmentCommandRuntime {
         changedPaths: ["/status", "/phase"],
       });
     }
+    let contextInventoryError = null;
+    if (promptState.draft?.workspace
+      && hasConfirmedTheme(promptState.draft)
+      && !inventoryMatchesDraft(promptState.contextInventory, promptState.draft)) {
+      try {
+        const contextInventory = this.inventoryContext({
+          ...context,
+          currentWorkspace: promptState.draft.workspace,
+          contextQuery: contextQueryForDraft(promptState.draft),
+        });
+        promptState = this.designStore.update(promptState.key, { contextInventory }, {
+          actorId: "system",
+          source: "controller",
+          reason: "targeted workspace inventory after theme confirmation",
+          changedPaths: ["/contextInventory"],
+        });
+      } catch (error) {
+        contextInventoryError = String(error?.message ?? error)
+          .replace(/[\r\n\u2028\u2029]+/g, " ")
+          .slice(0, 500);
+        this.log({
+          event: "department_context_inventory_failed",
+          chatId: context.chatId,
+          error: error?.message ?? String(error),
+        });
+      }
+    }
     return {
       action: "design",
       prompt: buildDepartmentDesignPrompt({
@@ -307,6 +358,7 @@ export class DepartmentCommandRuntime {
         userText: String(context.text ?? ""),
         actor: { id: context.senderId, role: "admin" },
         contextInventory: promptState.contextInventory,
+        contextInventoryError,
         draftCli: this.draftCli,
         storeFile: this.storeFile,
       }),

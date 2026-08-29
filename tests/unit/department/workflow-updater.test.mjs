@@ -161,6 +161,30 @@ describe('department workflow updater', () => {
     });
   });
 
+  it('extracts only the requested task protocol', () => {
+    const environment = fixture();
+    const updater = new DepartmentWorkflowUpdater({ organizationRoot: environment.organizationRoot });
+
+    const result = updater.protocol(environment.departmentId, 'slide_deck_production');
+
+    expect(result).toMatchObject({
+      departmentId: environment.departmentId,
+      protocol: { id: 'slide_deck_production', name: '传统 PPT 制作' },
+    });
+    expect(result).not.toHaveProperty('workflow');
+  });
+
+  it('allows removing the last protocol when the durable update is explicitly confirmed', () => {
+    const environment = fixture();
+    const updater = new DepartmentWorkflowUpdater({ organizationRoot: environment.organizationRoot });
+    const update = request(environment);
+    update.operations = [{ op: 'remove_task_protocol', protocolId: 'slide_deck_production' }];
+
+    updater.apply(environment.departmentId, update);
+
+    expect(JSON.parse(readFileSync(environment.workflowPath, 'utf8')).taskProtocols).toEqual([]);
+  });
+
   it('replaces one protocol transactionally and regenerates readable rules', () => {
     const environment = fixture();
     const updater = new DepartmentWorkflowUpdater({

@@ -34,6 +34,7 @@ jobs:
         run: |
           mkdir -p release
           pnpm pack --pack-destination release
+          cp release/lark-channel-bridge-department-*.tgz release/lark-channel-bridge-department.tgz
           cd release
           sha256sum *.tgz > SHA256SUMS
 
