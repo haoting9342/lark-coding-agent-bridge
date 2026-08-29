@@ -128,6 +128,10 @@ function charterRule(departmentId, draft) {
     '',
     '每次任务只读取当前命中的规程文件，不加载全部规程正文。',
     '',
+    '## 稳定记忆',
+    `- 开始新会话或继续部门任务前，读取并遵守 \`.workbuddy-department/${departmentId}/memory.md\` 中已经确认的事实和历史规则。`,
+    '- 记忆只保存经过确认、可跨会话复用的内容；临时讨论不写入稳定记忆。',
+    '',
     '## Skill 加载策略',
     '- 每个任务最多选择一个最匹配的主 Skill；没有匹配项时直接执行或自由探索。',
     '- 辅助 Skill 仅在任务确实需要额外能力且其命中条件明确成立时加载。',
@@ -141,6 +145,33 @@ function charterRule(departmentId, draft) {
     '- 新任务不强制创建规程；只有稳定、高频且值得复用的流程才建议沉淀。',
     '- 修改章程、规程、审批边界或能力计划前，必须先向用户展示变更并获得明确确认。',
     '- 已确认事实与原始聊天分离保存，不把密钥或敏感信息写入部门文件。',
+    '',
+  ].join('\n');
+}
+
+function memoryMarkdown(draft) {
+  const facts = (draft.confirmedFacts ?? []).map((item) => `- ${item}`);
+  const historicalRules = (draft.historicalRules ?? []).map((item) => `- ${item}`);
+  const contextSources = (draft.contextSources ?? []).map((item) => {
+    if (typeof item === 'string') return `- ${item}`;
+    return `- ${item.path}；类型：${item.type}；可信度：${item.confidence}`;
+  });
+  return [
+    '# 已确认的部门记忆',
+    '',
+    '以下内容已经经过用户确认，可以由新会话继承。未确认的讨论、临时偏好和开放问题不属于稳定记忆。',
+    '',
+    '## 已确认事实',
+    ...(facts.length ? facts : ['- 暂无。']),
+    '',
+    '## 历史规则',
+    ...(historicalRules.length ? historicalRules : ['- 暂无。']),
+    '',
+    '## 默认工作方式',
+    ...((draft.workflow ?? []).length ? draft.workflow.map((item) => `- ${item}`) : ['- 按部门章程和命中规程执行。']),
+    '',
+    '## 上下文来源',
+    ...(contextSources.length ? contextSources : ['- 仅使用当前任务和部门文件中明确需要的上下文。']),
     '',
   ].join('\n');
 }
@@ -231,7 +262,7 @@ export function buildWorkBuddyPackage({ departmentId, draft, workspace, confirme
     [`${packagePrefix}manifest.json`, json(manifest)],
     [`${packagePrefix}department.json`, json(department)],
     [`${packagePrefix}workflow.json`, json(workflow)],
-    [`${packagePrefix}memory.md`, '# 已确认的部门记忆\n\n只保存稳定、经过确认的事实。\n'],
+    [`${packagePrefix}memory.md`, memoryMarkdown(draft)],
     [`${packagePrefix}skills-plan.md`, json({ schemaVersion: 1, platform: 'workbuddy', capabilities: draft.capabilityPlan })],
   ]);
 }

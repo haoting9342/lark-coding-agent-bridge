@@ -1,6 +1,6 @@
 {
   "name": "lark-channel-bridge-department",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Feishu/Lark bridge with conversational department design and multi-agent organization management",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
