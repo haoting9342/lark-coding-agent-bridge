@@ -1,47 +1,105 @@
 # WorkBuddy 部门创建
 
-WorkBuddy 版本只负责把部门规则写入本地工作区，不创建飞书应用、不写群路由，也不启动 Bridge。WorkBuddy 本身负责飞书接入时，使用下面命令即可完成一次本地部门初始化。
+这套程序让 WorkBuddy 项目拥有与 Codex 版一致的部门设计效果：先与 Agent 自由讨论，草案可以反复修改；只有用户明确确认后，才生成正式章程和规程文件。WorkBuddy 自身负责飞书接入，本工具不创建飞书应用、不配置群路由，也不启动 Bridge。
 
-## 安装
+## 一、安装程序
+
+确认电脑已经安装 Node.js 20 或更高版本，然后执行：
 
 ```bash
 npm install -g lark-channel-bridge-department
 ```
 
-## 最小创建
+## 二、在项目中安装部门设计助手
+
+把下面的路径换成 WorkBuddy 当前项目的绝对路径：
 
 ```bash
-lark-channel-bridge-department workbuddy create \
-  --workspace "/绝对路径/工作区" \
-  --name "自媒体部门" \
-  --purpose "负责内容策划、制作、发布和复盘" \
-  --responsibility "制定选题与内容计划" \
-  --responsibility "完成发布前质量检查"
+lark-channel-bridge-department workbuddy department init \
+  --workspace "/绝对路径/WorkBuddy项目"
 ```
 
-也可以把完整部门规格放在 JSON 文件中：
+初始化只会创建部门设计入口、中文助手 Skill 和草案目录，不会创建正式部门。重复执行不会重复添加入口。
+
+## 三、与 WorkBuddy 自由讨论
+
+打开这个项目后，可以直接对 WorkBuddy 说：“帮我设计一个负责内容生产的部门”。设计助手会逐步与你讨论部门目标、职责、范围外事项、审批边界、常见任务、能力和交付标准，不要求一次填完表格。
+
+讨论中的草案通过下面的命令保存到 `.workbuddy-department/sessions/current.json`。规格可以不完整，此时不会出现正式部门章程：
 
 ```bash
-lark-channel-bridge-department workbuddy create --spec ./部门规格.json
+lark-channel-bridge-department workbuddy department draft \
+  --workspace "/绝对路径/WorkBuddy项目" \
+  --spec "/绝对路径/当前草案.json"
 ```
 
-规格文件沿用部门草案字段，支持 `taskProtocols`、`contextPolicy`、`skillPolicy`、`capabilityPlan`、审批边界和自由探索模式。这样 WorkBuddy 与 Codex 版本共享同一套任务规则，不需要复制两份流程定义。
+任务不必全部命中规程，系统允许四种处理方式：
 
-## 生成内容
+- 直接执行：明确、低风险且不需要固定流程的任务；
+- 单规程：只加载一个确实命中的规程；
+- 组合规程：任务确实跨越多个稳定流程时，按顺序组合；
+- 自由探索：新任务、低频任务或现有规程不适用时先探索。
 
-命令会在工作区生成：
+Skill 也按任务内容选择：通常只加载一个主 Skill，辅助 Skill 只有条件明确命中时才加载。
 
-- `.workbuddy-department/<部门编号>/department.json`：部门基本信息；
-- `.workbuddy-department/<部门编号>/workflow.json`：任务模式、规程和能力计划；
-- `.workbuddy-department/<部门编号>/AGENTS.md`：部门包内的完整规则；
-- `.workbuddy-department/<部门编号>/memory.md` 和 `skills-plan.md`；
-- 工作区根目录 `AGENTS.md`：带标记的部门规则覆盖段。
+## 四、确认并正式创建
 
-每次任务先判断直接执行、命中规程、组合规程或自由探索。只有命中的规程才需要提取，新的任务不必强行创建规程。WorkBuddy 侧应把 `.workbuddy-department/<部门编号>/workflow.json` 作为权威流程文件，并按需读取其中单个 `taskProtocols` 条目。
+WorkBuddy 展示最终方案后，只有下面这些完整表达会触发正式创建：
 
-## 安全行为
+- “同意创建”
+- “确认创建”
+- “按这个方案创建”
+- “确认部门创建”
 
-- 工作区必须是已存在的绝对路径，且不能是符号链接；
-- 已存在同编号部门或重复的工作区规则会拒绝写入；
-- 写入失败会删除本次新建的部门包；
-- 不会修改飞书配置、群路由、用户授权或 Bridge 状态。
+“可以”“好的”“继续”等表达只表示继续讨论，不会落盘。确认后，设计助手会保存完整规格并执行确认导入命令：
+
+```bash
+lark-channel-bridge-department workbuddy department import \
+  --workspace "/绝对路径/WorkBuddy项目" \
+  --spec "/绝对路径/部门规格.json" \
+  --confirm-create \
+  --confirmation-message "同意创建"
+```
+
+需要手动执行时，可以先修改仓库附带的 `docs/workbuddy-department-example.json`。`--confirm-create` 和 `--confirmation-message` 必须同时提供，而且确认文字只能使用上面列出的完整表达。
+
+## 五、生成的文件
+
+```text
+CODEBUDDY.md
+.codebuddy/
+  skills/
+    department-designer/
+      SKILL.md
+    <部门编号>-department/
+      SKILL.md
+    <部门编号>-protocol-<规程编号>/
+      SKILL.md
+.workbuddy-department/
+  sessions/
+  transactions/
+  <部门编号>/
+    manifest.json
+    department.json
+    workflow.json
+    memory.md
+    skills-plan.md
+```
+
+`CODEBUDDY.md` 只保存轻量入口和 Skill 索引，不保存每个规程的完整步骤。CodeBuddy 会自动加载项目 Rules，因此本工具不把规程正文放进 `.codebuddy/rules/`；部门章程和各规程分别保存为 `.codebuddy/skills/<名称>/SKILL.md`，由 WorkBuddy 根据任务意图按需加载。这样每轮对话不需要读取完整 `workflow.json`，也不会自动加载全部规程正文。
+
+## 六、安全与失败回滚
+
+- 工作区必须是已经存在的绝对普通目录，不能是符号链接或危险系统目录；
+- 同编号部门、重复索引或冲突文件会被拒绝，不会静默覆盖；
+- 已有 `CODEBUDDY.md` 内容会保留，只追加带唯一标记的部门段；
+- 初始化、保存草案或正式导入时都会先恢复上次中断事务；任意写入失败会恢复已有文件并删除本次新增的正式部门文件；
+- 成功和失败都会在 `.workbuddy-department/transactions/` 留下不含密钥的事务回执；
+- 回滚记录不保存原文件正文，只保存原始长度与 SHA-256 摘要；完成、失败或恢复后还会删除这些临时校验信息；
+- 进行中的回滚记录会绑定当前工作区，并由项目外的用户私有状态密钥签名；仓库内伪造的回滚 JSON 不能触发文件恢复或删除；
+- 正式部门目录是事务提交点：提交前只撤销经过签名且内容哈希完全匹配的本次写入，提交后中断则补齐成功回执，不会删除已提交部门；
+- 能力计划只记录期望状态，不会擅自安装需要账号、密钥或授权的能力。
+
+## 七、旧命令兼容
+
+原有 `workbuddy create` 命令仍可使用，但同样要求 `--confirm-create` 和 `--confirmation-message`，并生成相同的 `CODEBUDDY.md`、`.codebuddy/skills/` 和部门状态文件，不再生成另一套 `AGENTS.md` 架构。新用户应优先使用“初始化、自由讨论、明确确认、正式导入”的流程。

@@ -48,7 +48,9 @@ export function acquireDirectoryLock(lockPath, {
       } catch {
         age = 0;
       }
-      if (age < staleAfterMs || processIsAlive(owner?.pid)) {
+      const hasOwner = Number.isInteger(owner?.pid) && owner.pid > 0;
+      const ownerWriteGraceMs = Math.max(staleAfterMs, 1000);
+      if ((hasOwner && processIsAlive(owner.pid)) || (!hasOwner && age <= ownerWriteGraceMs)) {
         throw new Error(`directory lock is active: ${lockPath}`);
       }
       rmSync(lockPath, { recursive: true, force: true });

@@ -44,9 +44,12 @@ describe('clean npm install contract', () => {
       'department-runtime/bootstrap.mjs',
       'department-runtime/department-provisioner.mjs',
       'department-runtime/department-capability-materializer.mjs',
+      'department-runtime/workbuddy-workspace-initializer.mjs',
+      'department-runtime/workbuddy-provisioner.mjs',
       'assets/organization-template/organization.json',
       'docs/department-creation.md',
       'docs/organization-nodes.md',
+      'docs/workbuddy-department-example.json',
     ]) {
       expect(existsSync(path.join(packageRoot, required)), required).toBe(true);
     }
@@ -73,6 +76,23 @@ describe('clean npm install contract', () => {
     expect(status).toContain('status: ready');
     expect(existsSync(path.join(stateRoot, 'organizations', 'default', 'organization.json'))).toBe(true);
     expect(existsSync(path.join(temporaryHome, '.lark-channel'))).toBe(false);
+
+    const workbuddyWorkspace = path.join(temporaryHome, 'workbuddy-project');
+    mkdirSync(workbuddyWorkspace, { recursive: true });
+    execFileSync(process.execPath, [
+      cli, 'workbuddy', 'department', 'init', '--workspace', workbuddyWorkspace,
+    ], { cwd: temporaryHome, env, encoding: 'utf8', timeout: 30_000 });
+    execFileSync(process.execPath, [
+      cli, 'workbuddy', 'department', 'import',
+      '--workspace', workbuddyWorkspace,
+      '--spec', path.join(packageRoot, 'docs', 'workbuddy-department-example.json'),
+      '--confirm-create',
+      '--confirmation-message', '同意创建',
+    ], { cwd: temporaryHome, env, encoding: 'utf8', timeout: 30_000 });
+    expect(existsSync(path.join(workbuddyWorkspace, 'CODEBUDDY.md'))).toBe(true);
+    expect(existsSync(path.join(workbuddyWorkspace, '.codebuddy', 'skills', 'content-department', 'SKILL.md'))).toBe(true);
+    expect(existsSync(path.join(workbuddyWorkspace, '.workbuddy-department', 'content', 'manifest.json'))).toBe(true);
+    expect(readFileSync(path.join(workbuddyWorkspace, '.workbuddy-department', 'content', 'workflow.json'), 'utf8')).not.toContain('chatId');
 
     const organizationRoot = path.join(stateRoot, 'organizations', 'default');
     const profileRoot = path.join(stateRoot, 'profiles', 'default');

@@ -1,0 +1,39 @@
+{
+  "departmentId": "content",
+  "departmentName": "内容部",
+  "kind": "permanent",
+  "purpose": "持续完成高质量内容策划、制作和复盘",
+  "workspace": "/opt/workbuddy/content-project",
+  "responsibilities": ["制定选题与内容计划", "完成内容制作和质量检查"],
+  "outOfScope": ["未经确认直接对外发布"],
+  "workflow": ["理解任务和受众", "执行内容工作", "检查事实与格式", "交付并记录稳定结论"],
+  "businessLifecycle": [],
+  "taskProtocols": [
+    {
+      "id": "content_review",
+      "name": "内容审核",
+      "intents": ["审核稿件", "发布前检查"],
+      "purpose": "在发布前检查事实、结构和风险",
+      "requiredInputs": ["待审核稿件", "目标受众"],
+      "clarificationPolicy": "缺少稿件或发布目标时先询问用户",
+      "steps": ["检查事实依据", "检查结构与表达", "标记发布风险"],
+      "qualityChecks": ["关键事实有依据", "交付意见可以直接执行"],
+      "deliverables": ["审核意见"],
+      "completionCriteria": ["所有高风险问题已经标记"],
+      "skills": [],
+      "revisionPolicy": "用户确认稳定变更后再更新规程"
+    }
+  ],
+  "capabilityPlan": [],
+  "approvalBoundaries": ["对外发布前需要用户确认"],
+  "confirmedFacts": [],
+  "historicalRules": [],
+  "contextSources": [],
+  "openQuestions": [],
+  "mission": "持续提供可靠的内容服务",
+  "serviceCatalog": ["内容策划", "内容制作", "内容审核"],
+  "recurringWorkflows": [],
+  "defaultProjects": [],
+  "taskTypes": ["内容任务"],
+  "lifecycle": "active"
+}

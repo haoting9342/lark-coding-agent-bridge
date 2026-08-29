@@ -41,6 +41,11 @@ import {
   runOrganizationNodeActivate,
 } from './commands/organization-node';
 import { runWorkBuddyCreate } from './commands/workbuddy';
+import {
+  runWorkBuddyDepartmentDraft,
+  runWorkBuddyDepartmentImport,
+  runWorkBuddyDepartmentInit,
+} from './commands/workbuddy-department';
 
 const program = new Command();
 
@@ -206,15 +211,50 @@ const workbuddy = program
   .command('workbuddy')
   .description('在 WorkBuddy 工作区创建本地部门，不部署飞书桥接');
 
+const workbuddyDepartment = workbuddy
+  .command('department')
+  .description('先自由讨论部门方案，确认后生成 WorkBuddy 正式部门文件');
+
+workbuddyDepartment
+  .command('init')
+  .description('在工作区安装部门设计助手，不创建正式部门')
+  .requiredOption('--workspace <path>', 'WorkBuddy 项目工作区绝对路径')
+  .action(async (opts: { workspace: string }) => {
+    await runWorkBuddyDepartmentInit(opts);
+  });
+
+workbuddyDepartment
+  .command('draft')
+  .description('保存一份可不完整的部门讨论草案，不创建正式部门')
+  .requiredOption('--workspace <path>', 'WorkBuddy 项目工作区绝对路径')
+  .requiredOption('--spec <path>', '当前部门草案 JSON 文件')
+  .action(async (opts: { workspace: string; spec: string }) => {
+    await runWorkBuddyDepartmentDraft(opts);
+  });
+
+workbuddyDepartment
+  .command('import')
+  .description('导入已经确认的部门规格并生成正式部门文件')
+  .requiredOption('--workspace <path>', 'WorkBuddy 项目工作区绝对路径')
+  .requiredOption('--spec <path>', '完整部门规格 JSON 文件')
+  .option('--department-id <id>', '覆盖规格中的部门编号')
+  .option('--confirm-create', '确认用户已经明确同意正式创建')
+  .option('--confirmation-message <text>', '用户明确确认创建时的原始文字')
+  .action(async (opts: { workspace: string; spec: string; departmentId?: string; confirmCreate?: boolean; confirmationMessage?: string }) => {
+    await runWorkBuddyDepartmentImport(opts);
+  });
+
 workbuddy
   .command('create')
-  .description('创建 WorkBuddy 部门包并写入工作区 AGENTS.md')
+  .description('兼容命令：创建 WorkBuddy 部门包并写入 CODEBUDDY.md 与 .codebuddy/skills')
   .option('--spec <path>', '部门规格 JSON 文件')
   .option('--workspace <path>', '工作区绝对路径')
   .option('--name <name>', '部门名称')
   .option('--purpose <text>', '部门目标')
   .option('--responsibility <text>', '部门职责，可重复指定', (value, previous: string[]) => [...previous, value], [])
   .option('--department-id <id>', '部门编号')
+  .option('--confirm-create', '确认用户已经明确同意正式创建')
+  .option('--confirmation-message <text>', '用户明确确认创建时的原始文字')
   .action(async (opts: {
     spec?: string;
     workspace?: string;
@@ -222,6 +262,8 @@ workbuddy
     purpose?: string;
     responsibility?: string[];
     departmentId?: string;
+    confirmCreate?: boolean;
+    confirmationMessage?: string;
   }) => {
     await runWorkBuddyCreate(opts);
   });

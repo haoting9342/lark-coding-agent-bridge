@@ -9,6 +9,8 @@ describe('WorkBuddy department installer', () => {
     const workspace = mkdtempSync(path.join(tmpdir(), 'workbuddy-department-'));
     const result = createWorkBuddyDepartment({
       departmentId: 'content',
+      confirmCreate: true,
+      confirmationMessage: '同意创建',
       departmentName: '自媒体部门',
       purpose: '负责内容策划和发布',
       responsibilities: ['制定选题', '检查发布内容'],
@@ -30,8 +32,17 @@ describe('WorkBuddy department installer', () => {
     });
 
     expect(result.platform).toBe('workbuddy');
-    expect(readFileSync(path.join(workspace, 'AGENTS.md'), 'utf8')).toContain('内容审核');
+    expect(readFileSync(path.join(workspace, 'CODEBUDDY.md'), 'utf8')).toContain('内容审核');
+    expect(readFileSync(path.join(workspace, '.codebuddy/skills/content-protocol-content-review/SKILL.md'), 'utf8')).toContain('检查事实');
     expect(readFileSync(path.join(result.packageRoot, 'department.json'), 'utf8')).toContain('"platform": "workbuddy"');
     expect(readFileSync(path.join(result.packageRoot, 'workflow.json'), 'utf8')).not.toContain('chatId');
+  });
+
+  it('rejects the legacy creation path without exact confirmation evidence', () => {
+    const workspace = mkdtempSync(path.join(tmpdir(), 'workbuddy-department-'));
+
+    expect(() => createWorkBuddyDepartment({
+      departmentId: 'content', departmentName: '内容部', purpose: '内容生产', workspace,
+    })).toThrow(/确认/);
   });
 });

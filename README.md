@@ -114,18 +114,14 @@ lark-cli 身份策略按 profile 隔离。每个 Agent 使用当前 profile 的 
 
 ## WorkBuddy 本地创建部门
 
-WorkBuddy 已经负责飞书接入时，不需要再部署 Bridge。可以直接在 WorkBuddy 工作区创建部门规则：
+WorkBuddy 已经负责飞书接入时，不需要再部署 Bridge。先在 WorkBuddy 项目安装部门设计助手：
 
 ```bash
-lark-channel-bridge-department workbuddy create \
-  --workspace "/absolute/path/to/workspace" \
-  --name "自媒体部门" \
-  --purpose "负责内容策划、制作、发布和复盘" \
-  --responsibility "制定选题与内容计划" \
-  --responsibility "完成发布前质量检查"
+lark-channel-bridge-department workbuddy department init \
+  --workspace "/absolute/path/to/workspace"
 ```
 
-该命令只写入工作区的 `AGENTS.md` 和 `.workbuddy-department/<部门编号>/` 部门包，不修改飞书配置、群路由或 Bridge 状态。完整规格也可以通过 `--spec <规格文件.json>` 一次导入；规格字段与 Codex 版共用，包含任务模式、按需规程、Skill 策略、能力计划和审批边界。详见[WorkBuddy 部门创建说明](./docs/workbuddy-department.md)。
+之后可以直接与 WorkBuddy 自由讨论部门方案。助手通过 `workbuddy department draft` 保存未完成草案；只有用户明确回复“同意创建”等确认语句后，才会调用同时带 `--confirm-create` 和 `--confirmation-message` 的导入命令，生成 `CODEBUDDY.md`、部门章程 Skill 和按需规程 Skill。规格字段与 Codex 版共用，不修改飞书配置、群路由或 Bridge 状态。详见[WorkBuddy 部门创建说明](./docs/workbuddy-department.md)。
 
 ## 任务执行方式
 

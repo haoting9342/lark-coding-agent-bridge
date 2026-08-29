@@ -1,12 +1,12 @@
 # WorkBuddy 桌面版部门创建设计实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **给执行 Agent：** 按任务逐项执行本计划，并使用测试驱动和完成前验证流程。步骤使用复选框（`- [ ]`）记录状态。
 
-**Goal:** 在腾讯云代码助手 WorkBuddy 工作区实现与 Codex 一致的部门自由设计、明确确认、章程持久化和按需规程加载流程。
+**目标：** 在腾讯云代码助手 WorkBuddy 工作区实现与 Codex 一致的部门自由设计、明确确认、章程持久化和按需规程加载流程。
 
-**Architecture:** 继续复用 `department-runtime` 的草案校验、规程模型和能力计划，不复制业务规则。新增 WorkBuddy 适配层，把已确认草案转换为 `CODEBUDDY.md`、`.codebuddy/rules/*.mdc`、`.codebuddy/skills/`、Manifest 和 `.workbuddy-department/` 状态文件；新增本地会话状态机保存设计草案，并在明确创建确认后调用事务写入器。
+**架构：** 继续复用 `department-runtime` 的草案校验、规程模型和能力计划，不复制业务规则。新增 WorkBuddy 适配层，把已确认草案转换为 `CODEBUDDY.md`、`.codebuddy/skills/`、内部清单和 `.workbuddy-department/` 状态文件；新增本地会话状态机保存设计草案，并在明确创建确认后调用事务写入器。
 
-**Tech Stack:** Node.js 20、TypeScript、ESM、Vitest、Commander、现有 `department-runtime` JavaScript 模块。
+**技术栈：** Node.js 20、TypeScript、ESM、Vitest、Commander、现有 `department-runtime` JavaScript 模块。
 
 ---
 
@@ -18,7 +18,7 @@
 
 - [ ] **Step 1: 写失败测试**
 
-覆盖以下断言：输入合法部门草案后，转换器生成 `CODEBUDDY.md` 索引、一个章程 `.mdc`、每个规程一个 `.mdc`、`manifest.json`、`department.json`、`workflow.json`、`memory.md`、`skills-plan.md`；规程索引只包含名称、编号和描述，不包含步骤正文；`.mdc` 头部包含 `description`、`alwaysApply: false`、`enabled: true`。
+覆盖以下断言：输入合法部门草案后，转换器生成 `CODEBUDDY.md` 索引、一个部门章程 Skill、每个规程一个独立 Skill、`manifest.json`、`department.json`、`workflow.json`、`memory.md`、`skills-plan.md`；规程索引只包含名称、编号和描述，不包含步骤正文；每个 `SKILL.md` 头部包含 `name` 和 `description`。
 
 - [ ] **Step 2: 运行测试确认失败**
 
@@ -32,8 +32,8 @@
 
 ```text
 CODEBUDDY.md
-.codebuddy/rules/<departmentId>-章程.mdc
-.codebuddy/rules/<departmentId>-规程-<protocolId>.mdc
+.codebuddy/skills/<departmentId>-department/SKILL.md
+.codebuddy/skills/<departmentId>-protocol-<protocolId>/SKILL.md
 .workbuddy-department/<departmentId>/manifest.json
 .workbuddy-department/<departmentId>/department.json
 .workbuddy-department/<departmentId>/workflow.json
@@ -146,10 +146,10 @@ git commit -m "feat(workbuddy): add transactional department provisioning"
 
 ```text
 lark-channel-bridge-department workbuddy department init --workspace <绝对路径>
-lark-channel-bridge-department workbuddy department import --workspace <绝对路径> --spec <规格文件> --confirm-create
+lark-channel-bridge-department workbuddy department import --workspace <绝对路径> --spec <规格文件> --confirm-create --confirmation-message "同意创建"
 ```
 
-`init` 只写 `.codebuddy/rules/部门创建助手.mdc`、创建或更新 `CODEBUDDY.md` 的入口索引和 `.workbuddy-department/sessions/`；设计助手规则中明确允许自由讨论，并要求最终确认后调用本地导入命令。`import` 使用共享草案校验和事务写入器。
+`init` 只写 `.codebuddy/skills/department-designer/SKILL.md`、创建或更新 `CODEBUDDY.md` 的入口索引和 `.workbuddy-department/sessions/`；设计助手 Skill 中明确允许自由讨论，并要求最终确认后调用本地导入命令。`import` 使用共享草案校验和事务写入器。
 
 - [ ] **Step 4: 运行测试确认通过**
 
@@ -227,7 +227,7 @@ pnpm audit --prod --json
 ```bash
 WB_WORKSPACE="$(mktemp -d)"
 node dist/cli.js workbuddy department init --workspace "$WB_WORKSPACE"
-node dist/cli.js workbuddy department import --workspace "$WB_WORKSPACE" --spec docs/workbuddy-department-example.json --confirm-create
+node dist/cli.js workbuddy department import --workspace "$WB_WORKSPACE" --spec docs/workbuddy-department-example.json --confirm-create --confirmation-message "同意创建"
 find "$WB_WORKSPACE/.codebuddy" "$WB_WORKSPACE/.workbuddy-department" -type f -print
 ```
 

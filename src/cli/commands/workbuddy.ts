@@ -14,6 +14,8 @@ export interface WorkBuddyCreateOptions {
   purpose?: string;
   responsibility?: string[];
   departmentId?: string;
+  confirmCreate?: boolean;
+  confirmationMessage?: string;
 }
 
 export async function runWorkBuddyCreate(options: WorkBuddyCreateOptions): Promise<unknown> {
@@ -21,13 +23,20 @@ export async function runWorkBuddyCreate(options: WorkBuddyCreateOptions): Promi
   const spec = options.spec
     ? readWorkBuddySpec(resolve(options.spec))
     : {};
+  const {
+    confirmCreate: _embeddedConfirmation,
+    confirmationMessage: _embeddedConfirmationMessage,
+    ...safeSpec
+  } = spec;
   const input = {
-    ...spec,
+    ...safeSpec,
     ...(options.workspace ? { workspace: options.workspace } : {}),
     ...(options.name ? { departmentName: options.name } : {}),
     ...(options.purpose ? { purpose: options.purpose } : {}),
     ...(options.responsibility?.length ? { responsibilities: options.responsibility } : {}),
     ...(options.departmentId ? { departmentId: options.departmentId } : {}),
+    confirmCreate: options.confirmCreate === true,
+    confirmationMessage: options.confirmationMessage,
   };
   if (!input.workspace || !input.departmentName || !input.purpose) {
     throw new Error('WorkBuddy 创建需要 --workspace、--name、--purpose，或通过 --spec 提供完整规格');

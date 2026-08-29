@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -27,6 +27,28 @@ describe('department directory lock', () => {
 
     expect(() => acquireDirectoryLock(lock)).toThrow(/active|busy|占用/i);
 
+    release();
+  });
+
+  it('does not remove a newly created lock before its owner file is written', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'department-owner-window-'));
+    const lock = path.join(root, 'operation.lock');
+    mkdirSync(lock);
+
+    expect(() => acquireDirectoryLock(lock, { staleAfterMs: 0 })).toThrow(/active|busy|占用/i);
+    expect(existsSync(lock)).toBe(true);
+    rmSync(lock, { recursive: true });
+  });
+
+  it('immediately recovers a lock whose recorded process no longer exists', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'department-dead-lock-'));
+    const lock = path.join(root, 'operation.lock');
+    mkdirSync(lock);
+    writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({ pid: 2147483647, createdAt: Date.now() }));
+
+    const release = acquireDirectoryLock(lock);
+
+    expect(existsSync(path.join(lock, 'owner.json'))).toBe(true);
     release();
   });
 });
