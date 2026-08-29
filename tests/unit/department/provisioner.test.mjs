@@ -189,6 +189,9 @@ describe('node-native department provisioner', () => {
     const authoritativeWorkflow = path.join(departmentRoot, 'workflow.json');
     expect(workspaceAgents).toContain(`权威工作流文件：\`${authoritativeWorkflow}\``);
     expect(workspaceAgents).toContain(
+      `权威部门记忆文件：\`${path.join(departmentRoot, 'memory.md')}\``,
+    );
+    expect(workspaceAgents).toContain(
       'lark-channel-bridge-department organization workflow show content_design',
     );
     expect(workspaceAgents).toContain(

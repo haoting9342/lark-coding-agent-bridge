@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 const markerStart = (departmentId) =>
   `<!-- lark-channel-bridge-department:start ${departmentId} -->`;
 const markerEnd = (departmentId) =>
@@ -24,9 +26,11 @@ export function workflowMaintenanceLines({ departmentId, workflowPath }) {
   if (typeof workflowPath !== 'string' || !workflowPath.startsWith('/')) {
     throw new Error('workflowPath must be an absolute path');
   }
+  const memoryPath = path.join(path.dirname(workflowPath), 'memory.md');
   return [
     '### 部门流程维护',
     `- 权威工作流文件：\`${workflowPath}\`。不要依赖工作区内同名文件，也不要自行猜测控制面路径。`,
+    `- 权威部门记忆文件：\`${memoryPath}\`。开始新会话或继续部门任务前，读取其中已确认的稳定事实和历史规则；不要把原始聊天全文当作记忆。`,
     `- 先使用 \`lark-channel-bridge-department organization workflow show ${departmentId}\` 读取当前版本、SHA-256 和 apply 请求模板。`,
     `- 执行任务时不要读取完整工作流；只使用 \`lark-channel-bridge-department organization workflow protocol ${departmentId} <规程编号>\` 提取命中的单个规程。`,
     '- 用户说“这次”“当前这份”或“先这样做”时，只影响当前任务，不修改部门长期流程。',

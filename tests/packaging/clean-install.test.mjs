@@ -66,7 +66,7 @@ describe('clean npm install contract', () => {
       encoding: 'utf8',
       timeout: 30_000,
     }).trim();
-    expect(version).toBe('0.7.3');
+    expect(version).toBe('0.7.4');
     const status = execFileSync(process.execPath, [cli, 'organization', 'status'], {
       cwd: temporaryHome,
       env,
