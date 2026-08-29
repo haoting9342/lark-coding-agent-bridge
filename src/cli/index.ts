@@ -40,6 +40,7 @@ import {
   runOrganizationNodeRegister,
   runOrganizationNodeActivate,
 } from './commands/organization-node';
+import { runWorkBuddyCreate } from './commands/workbuddy';
 
 const program = new Command();
 
@@ -199,6 +200,30 @@ organization
   .description('Read a handoff receipt for primary-node synthesis')
   .action(async (departmentId: string, taskId: string) => {
     await runOrganizationHandoffStatus(departmentId, taskId);
+  });
+
+const workbuddy = program
+  .command('workbuddy')
+  .description('在 WorkBuddy 工作区创建本地部门，不部署飞书桥接');
+
+workbuddy
+  .command('create')
+  .description('创建 WorkBuddy 部门包并写入工作区 AGENTS.md')
+  .option('--spec <path>', '部门规格 JSON 文件')
+  .option('--workspace <path>', '工作区绝对路径')
+  .option('--name <name>', '部门名称')
+  .option('--purpose <text>', '部门目标')
+  .option('--responsibility <text>', '部门职责，可重复指定', (value, previous: string[]) => [...previous, value], [])
+  .option('--department-id <id>', '部门编号')
+  .action(async (opts: {
+    spec?: string;
+    workspace?: string;
+    name?: string;
+    purpose?: string;
+    responsibility?: string[];
+    departmentId?: string;
+  }) => {
+    await runWorkBuddyCreate(opts);
   });
 
 profile
