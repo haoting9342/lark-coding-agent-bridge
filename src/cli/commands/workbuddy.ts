@@ -19,6 +19,9 @@ export interface WorkBuddyCreateOptions {
 }
 
 export async function runWorkBuddyCreate(options: WorkBuddyCreateOptions): Promise<unknown> {
+  if (!options.spec) {
+    throw new Error('旧版 workbuddy create 不再支持填写名称后直接创建；请先执行 workbuddy department init，与 WorkBuddy 自由讨论并保存草案，再使用 department import');
+  }
   const { createWorkBuddyDepartment, readWorkBuddySpec } = await import(/* @vite-ignore */ runtimeEntry());
   const spec = options.spec
     ? readWorkBuddySpec(resolve(options.spec))
@@ -37,6 +40,7 @@ export async function runWorkBuddyCreate(options: WorkBuddyCreateOptions): Promi
     ...(options.departmentId ? { departmentId: options.departmentId } : {}),
     confirmCreate: options.confirmCreate === true,
     confirmationMessage: options.confirmationMessage,
+    requireDesignDraft: true,
   };
   if (!input.workspace || !input.departmentName || !input.purpose) {
     throw new Error('WorkBuddy 创建需要 --workspace、--name、--purpose，或通过 --spec 提供完整规格');

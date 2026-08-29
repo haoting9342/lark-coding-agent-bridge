@@ -123,7 +123,7 @@ lark-channel-bridge-department workbuddy department init \
   --workspace "/absolute/path/to/workspace"
 ```
 
-之后可以直接与 WorkBuddy 自由讨论部门方案。助手通过 `workbuddy department draft` 保存未完成草案；只有用户明确回复“同意创建”等确认语句后，才会调用同时带 `--confirm-create` 和 `--confirmation-message` 的导入命令，生成 `CODEBUDDY.md`、部门章程 Skill 和按需规程 Skill。规格字段与 Codex 版共用，不修改飞书配置、群路由或 Bridge 状态。详见[WorkBuddy 部门创建说明](./docs/workbuddy-department.md)。
+之后可以直接与 WorkBuddy 自由讨论部门方案。助手必须先通过 `workbuddy department draft` 保存至少一轮包含主题、职责和基本工作流程的草案；只有用户明确回复“同意创建”等确认语句后，才会调用同时带 `--confirm-create` 和 `--confirmation-message` 的导入命令，生成 `CODEBUDDY.md`、部门章程 Skill 和按需规程 Skill。仅填写名称和工作区不会创建部门。规格字段与 Codex 版共用，不修改飞书配置、群路由或 Bridge 状态。详见[WorkBuddy 部门创建说明](./docs/workbuddy-department.md)。
 
 ## 任务执行方式
 

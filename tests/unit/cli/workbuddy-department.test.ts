@@ -56,6 +56,19 @@ describe('WorkBuddy department CLI', () => {
     expect(existsSync(path.join(workspace, '.workbuddy-department/content'))).toBe(false);
   });
 
+  it('does not allow the legacy create command to provision inline fields', async () => {
+    const workspace = mkdtempSync(path.join(tmpdir(), 'workbuddy-cli-'));
+
+    await expect(runWorkBuddyCreate({
+      workspace,
+      name: '内容部',
+      purpose: '内容生产',
+      confirmCreate: true,
+      confirmationMessage: '同意创建',
+    })).rejects.toThrow(/自由讨论|部门设计|department import/i);
+    expect(existsSync(path.join(workspace, '.workbuddy-department'))).toBe(false);
+  });
+
   it('persists an incomplete conversational draft without creating formal files', async () => {
     const workspace = mkdtempSync(path.join(tmpdir(), 'workbuddy-cli-'));
     const spec = path.join(workspace, '部分草案.json');
@@ -80,6 +93,8 @@ describe('WorkBuddy department CLI', () => {
     const spec = path.join(workspace, '部门规格.json');
     writeFileSync(spec, JSON.stringify(readySpec(workspace)));
 
+    await runWorkBuddyDepartmentDraft({ workspace, spec, output: () => {} });
+
     const result = await runWorkBuddyDepartmentImport({
       workspace, spec, confirmCreate: true, confirmationMessage: '同意创建', output: () => {},
     });
@@ -90,10 +105,36 @@ describe('WorkBuddy department CLI', () => {
     expect(JSON.parse(readFileSync(path.join(workspace, '.workbuddy-department/sessions/current.json'), 'utf8')).status).toBe('confirmed');
   });
 
+  it('rejects a complete spec when no conversational draft was saved first', async () => {
+    const workspace = mkdtempSync(path.join(tmpdir(), 'workbuddy-cli-'));
+    const spec = path.join(workspace, '部门规格.json');
+    writeFileSync(spec, JSON.stringify(readySpec(workspace)));
+
+    await expect(runWorkBuddyDepartmentImport({
+      workspace, spec, confirmCreate: true, confirmationMessage: '同意创建', output: () => {},
+    })).rejects.toThrow(/先.*草案|设计对话|draft/i);
+    expect(existsSync(path.join(workspace, '.workbuddy-department/content'))).toBe(false);
+  });
+
+  it('rejects a draft that only contains the department name before formal import', async () => {
+    const workspace = mkdtempSync(path.join(tmpdir(), 'workbuddy-cli-'));
+    const partial = path.join(workspace, '部分草案.json');
+    const spec = path.join(workspace, '部门规格.json');
+    writeFileSync(partial, JSON.stringify({ departmentName: '内容部' }));
+    writeFileSync(spec, JSON.stringify(readySpec(workspace)));
+    await runWorkBuddyDepartmentDraft({ workspace, spec: partial, output: () => {} });
+
+    await expect(runWorkBuddyDepartmentImport({
+      workspace, spec, confirmCreate: true, confirmationMessage: '同意创建', output: () => {},
+    })).rejects.toThrow(/主题|流程|草案|设计对话/i);
+    expect(existsSync(path.join(workspace, '.workbuddy-department/content'))).toBe(false);
+  });
+
   it('rejects a vague confirmation even when the CLI flag is present', async () => {
     const workspace = mkdtempSync(path.join(tmpdir(), 'workbuddy-cli-'));
     const spec = path.join(workspace, '部门规格.json');
     writeFileSync(spec, JSON.stringify(readySpec(workspace)));
+    await runWorkBuddyDepartmentDraft({ workspace, spec, output: () => {} });
 
     await expect(runWorkBuddyDepartmentImport({
       workspace, spec, confirmCreate: true, confirmationMessage: '可以', output: () => {},
@@ -105,6 +146,7 @@ describe('WorkBuddy department CLI', () => {
     const workspace = mkdtempSync(path.join(tmpdir(), 'workbuddy-cli-'));
     const spec = path.join(workspace, '部门规格.json');
     writeFileSync(spec, JSON.stringify(readySpec(workspace)));
+    await runWorkBuddyDepartmentDraft({ workspace, spec, output: () => {} });
     await runWorkBuddyDepartmentImport({
       workspace, spec, confirmCreate: true, confirmationMessage: '同意创建', output: () => {},
     });

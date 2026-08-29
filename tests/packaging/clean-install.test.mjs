@@ -83,6 +83,11 @@ describe('clean npm install contract', () => {
       cli, 'workbuddy', 'department', 'init', '--workspace', workbuddyWorkspace,
     ], { cwd: temporaryHome, env, encoding: 'utf8', timeout: 30_000 });
     execFileSync(process.execPath, [
+      cli, 'workbuddy', 'department', 'draft',
+      '--workspace', workbuddyWorkspace,
+      '--spec', path.join(packageRoot, 'docs', 'workbuddy-department-example.json'),
+    ], { cwd: temporaryHome, env, encoding: 'utf8', timeout: 30_000 });
+    execFileSync(process.execPath, [
       cli, 'workbuddy', 'department', 'import',
       '--workspace', workbuddyWorkspace,
       '--spec', path.join(packageRoot, 'docs', 'workbuddy-department-example.json'),

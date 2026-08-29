@@ -75,6 +75,7 @@ export async function runWorkBuddyDepartmentImport(
     departmentId,
     draft: { ...draft, workspace },
     confirmationMessage: options.confirmationMessage,
+    requireDesignDraft: true,
   }) as WorkBuddyDepartmentResult;
   (options.output ?? console.log)(JSON.stringify(result, null, 2));
   return result;

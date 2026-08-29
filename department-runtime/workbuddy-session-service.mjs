@@ -73,9 +73,37 @@ export function confirmAndProvisionWorkBuddyDepartment({
   departmentId,
   draft,
   confirmationMessage,
+  requireDesignDraft = false,
   provisioner = new WorkBuddyProvisioner(),
 }) {
   return withSessionLock(workspace, ({ resolvedWorkspace, statePath }) => {
+    if (requireDesignDraft) {
+      const persisted = readState(statePath);
+      const persistedDraft = persisted?.draft;
+      const hasCoreDesign = typeof persistedDraft?.departmentName === 'string'
+        && persistedDraft.departmentName.trim().length > 0
+        && typeof persistedDraft?.purpose === 'string'
+        && persistedDraft.purpose.trim().length > 0
+        && Array.isArray(persistedDraft?.responsibilities)
+        && persistedDraft.responsibilities.some((item) => typeof item === 'string' && item.trim().length > 0)
+        && Array.isArray(persistedDraft?.workflow)
+        && persistedDraft.workflow.some((item) => typeof item === 'string' && item.trim().length > 0);
+      const hasDiscussion = persisted
+        && ['designing', 'awaiting_confirmation'].includes(persisted.status)
+        && Array.isArray(persisted.history)
+        && persisted.history.length > 0
+        && hasCoreDesign;
+      if (!hasDiscussion) {
+        throw new Error('请先与 WorkBuddy 完成部门设计对话并保存草案，再正式导入');
+      }
+      if (persisted.draft.workspace !== undefined && persisted.draft.workspace !== path.resolve(resolvedWorkspace)) {
+        throw new Error('正式规格与已保存的部门设计草案不属于同一工作区');
+      }
+      if (persisted.draft.departmentName && draft.departmentName
+        && persisted.draft.departmentName !== draft.departmentName) {
+        throw new Error('正式规格与已保存的部门设计草案部门名称不一致');
+      }
+    }
     const session = createSession(statePath);
     session.applyProposal({ ...draft, workspace: resolvedWorkspace }, {
       source: 'confirmed_spec',

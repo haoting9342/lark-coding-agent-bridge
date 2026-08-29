@@ -57,6 +57,7 @@ export function createWorkBuddyDepartment(input) {
     departmentId,
     draft,
     confirmationMessage: input.confirmationMessage,
+    requireDesignDraft: input.requireDesignDraft === true,
   });
 }
 

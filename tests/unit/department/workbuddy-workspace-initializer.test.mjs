@@ -62,4 +62,14 @@ describe('WorkBuddy workspace initializer safety', () => {
     expect(existsSync(packageRoot)).toBe(false);
     expect(existsSync(pendingRoot)).toBe(false);
   });
+
+  it('makes the conversational gate explicit in the generated WorkBuddy skill', () => {
+    const workspace = mkdtempSync(path.join(tmpdir(), 'workbuddy-init-'));
+
+    initializer.initializeWorkBuddyWorkspace({ workspace });
+
+    const skill = readFileSync(path.join(workspace, '.codebuddy/skills/department-designer/SKILL.md'), 'utf8');
+    expect(skill).toContain('禁止调用旧版 `workbuddy create`');
+    expect(skill).toContain('必须先通过 `workbuddy department draft` 保存至少一轮讨论草案');
+  });
 });
